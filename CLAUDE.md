@@ -11,16 +11,18 @@ Pedram (pb357@cam.ac.uk, GitHub: **pedbad**), on macOS. Working style is non-neg
 
 A Persian pronunciation-scoring app: a learner records a word, the engine compares it vowel-by-vowel against a native speaker (Persian script hides its short vowels — the core learning problem), and returns colour-coded per-vowel feedback with hints. Target: a pilot with Cambridge Language Centre CULP Persian learners in Michaelmas term 2026. Engine: Montreal Forced Aligner + Whisper gatekeeper + MFCC/DTW scorer, in Docker. Web app: Django 5 built on Pedram's own scaffold [`pedbad/langcen_base`](https://github.com/pedbad/langcen_base) (Tailwind v4, ShadCN-Django cotton components, auth + invite emails + CSV student seeding already built and tested).
 
-## The documents (in the connected folder; later in the repo's `docs/`)
+## The documents (paths as they are in this repository)
 
-- **`DECISIONS.md`** — AUTHORITATIVE. Nine agreed decisions, D1–D9, with rationale. Where any document conflicts, this wins. New decisions are added as dated entries — never rewrite history.
-- **`BUILD_PLAN.md`** — THE EXECUTION DOCUMENT. 35 steps in 6 parts, each with Goal / Do / ✅ Check / If-it-fails, plus a master checklist. All work happens here, starting at Step 1.
-- **`FABLE_REVIEW.md`** — the strategy and the "why": phases, checkpoints, contingencies, pilot plan.
+- **`docs/DECISIONS.md`** — AUTHORITATIVE. Nine agreed decisions, D1–D9, with rationale. Where any document conflicts, this wins. New decisions are added as dated entries — never rewrite history.
+- **`docs/BUILD_PLAN.md`** — THE EXECUTION DOCUMENT. 35 steps in 6 parts, each with Goal / Do / ✅ Check / If-it-fails, plus a master checklist. All work happens here. **Start at the step the journal names, not at Step 1.**
+- **`docs/FABLE_REVIEW.md`** — the strategy and the "why": phases, checkpoints, contingencies, pilot plan.
 - **`README.md`** — must always contain working build/run instructions (the D1 rule).
-- **`prototype/`** — historical design docs with decision banners at the top; the aeneas-based sections are superseded — never implement them.
-- **`memory/JOURNAL.md`** — THE PROJECT'S MEMORY. Append-only session log, synced across Pedram's machines via the repo. Read the latest entry at every session start; append an entry at every session end.
+- **`docs/prototype/`** — historical design docs with decision banners at the top; the aeneas-based sections are superseded — never implement them.
+- **`docs/START_PROMPT.md`** — the session-opening prompts, including the fresh-machine variant and a list of what a clone does and does not bring.
+- **`memory/JOURNAL.md`** — THE PROJECT'S MEMORY, and the authority on where work stopped. Append-only session log, synced across machines via this repository. Read the latest entry at every session start; append an entry at every session end.
 - **`memory/RESEARCH_LOG.md`** — raw material for a future paper/poster for language-teaching venues. Append dated notes whenever something publication-worthy happens.
-- **`emails/`** — draft correspondence (tutor meeting, DPIA/ethics). Local only — do **not** copy into the public repo.
+- **`memory/SETUP_LOG.md`** — plain-English record of every tool the project installs and why, with the versions verified per machine, and how this repository relates to the scaffold. The reference when setting up a new machine.
+- **`~/Sites/persian-private/`** — OUTSIDE this repository and does not sync between machines: draft correspondence (`emails/`), and all native-speaker recording material including speaker identities and consent records. It exists on the MacBook "neo" only. Never copy any of it into the repository, and never assume it is present.
 
 ## Decisions in force (summary — full text in DECISIONS.md)
 
@@ -28,7 +30,15 @@ A Persian pronunciation-scoring app: a learner records a word, the engine compar
 
 ## Current state
 
-Documentation complete; **zero code written**. Next action: **BUILD_PLAN.md Step 1** (Part A, system checks). The repo folder `~/Sites/persian-pronunciation` does not exist yet — it is created at Step 11 by cloning the scaffold. The old `~/Sites/persian` folder is the docs source and becomes a deletable backup after Step 13's push is verified.
+**Do not trust a summary in this file to tell you where the work stopped — read the latest entry in `memory/JOURNAL.md`. That is the only current answer, and it names the exact next BUILD_PLAN step.**
+
+Fixed facts, unlikely to change:
+
+- The repository is `github.com/pedbad/persian-pronunciation` (public), and it lives locally at **`~/Sites/persian`**. The local folder name and the repository name deliberately differ. `~/Sites/persian` is the project — it is not a backup, and nothing in it should be deleted.
+- Two git remotes: `origin` is this project (normal `pull`/`push`); `scaffold` is `pedbad/langcen_base`, kept connected so scaffold improvements can be merged in later (D7).
+- Parts A and B of BUILD_PLAN were completed on 7 August 2026: developer tooling installed and verified, repository created from the scaffold, documents and working memory moved into it. `memory/SETUP_LOG.md` records exactly what was installed and why.
+- A second machine repeats only Steps 9 and 10 (git identity, SSH key) and then clones. Everything else in Parts A–B is already done. Check this machine's tooling against `memory/SETUP_LOG.md` before assuming anything is installed.
+- A Python virtual environment must never be copied between machines and its parent folder must never be renamed after it is created — it records its own absolute path. Create a fresh one per machine. `.env`, `node_modules/`, the database and the Docker images are all per-machine too.
 
 ## Skills already installed — use them at the right moments
 
