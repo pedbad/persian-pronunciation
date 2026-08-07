@@ -88,3 +88,11 @@ data/*.csv
 !src/core/static/core/js/lib/
 !src/core/static/core/js/lib/**
 !src/core/static/core/js/lib/**/*.min.js
+
+# ---- Claude Code tooling artifacts ----
+# Plugin state, regenerated per machine; not project content.
+.claude/
+
+# ---- never in the public repo ----
+# Draft correspondence lives outside the repository (see docs/BUILD_PLAN.md Step 13).
+emails/
