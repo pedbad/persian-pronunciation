@@ -26,11 +26,11 @@ Two authentications are built and verified along the way: **GitHub** (SSH keys, 
 - [x] 8. Praat + pre-commit
 
 **Part B — Git, GitHub authentication, the repo**
-- [ ] 9. Git knows who you are
-- [ ] 10. SSH key created and GitHub accepts it
-- [ ] 11. Project created from the langcen_base scaffold
-- [ ] 12. New public GitHub repo, first push
-- [ ] 13. Project docs moved into the repo
+- [x] 9. Git knows who you are
+- [x] 10. SSH key created and GitHub accepts it
+- [x] 11. Project created from the langcen_base scaffold
+- [x] 12. New public GitHub repo, first push
+- [x] 13. Project docs moved into the repo (folder-swap variant done: repo root is `~/Sites/persian`)
 
 **Part C — Scaffold running + app login proven**
 - [ ] 14. Python env, npm install, database, dev server
@@ -279,6 +279,14 @@ git push
 > cd persian && git remote -v   # remotes are unaffected by the rename
 > ```
 > From here on, wherever this document says `~/Sites/persian-pronunciation`, read `~/Sites/persian`. Keep `persian-docs-backup` until Step 13's push is verified on GitHub, then delete it — the repo (plus GitHub) is now the single source of truth. Only the local folder name changes; the GitHub repo stays `persian-pronunciation`.
+>
+> **Before deleting the backup — rescue what git cannot hold.** `emails/` is deliberately never copied into the public repo, so the backup folder is its *only* copy and deleting it destroys the drafts. Move it somewhere outside the repo first, and take a frozen zip of the whole pre-swap folder as insurance against a mistyped copy:
+> ```bash
+> mkdir -p ~/Sites/persian-private/archive
+> cp -R ~/Sites/persian-docs-backup/emails ~/Sites/persian-private/emails
+> cd ~/Sites && zip -r -q persian-private/archive/docs-preswap-$(date +%F).zip persian-docs-backup -x '*.DS_Store'
+> ```
+> A zip rather than a live folder is deliberate: a second *editable* copy of `DECISIONS.md` or `BUILD_PLAN.md` sitting in `~/Sites` is how two machines silently end up working from different versions. Verify the copies (`diff -rq`) before removing anything.
 
 > **Part B complete — authentication #1 done.** You own a public repo, pushed over SSH, seeded from your own scaffold, docs included.
 
