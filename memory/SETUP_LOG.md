@@ -8,7 +8,7 @@
 
 ---
 
-## Part A — Your Mac (completed 7 August 2026, Pedram's Mac, macOS 25.5 / Apple Silicon)
+## Part A — Your Mac (completed 7 August 2026, MacBook "neo", macOS 25.5 / Apple Silicon)
 
 Part A installs nothing project-specific. It stocks the machine with general tools. Nothing after Part A installs anything onto macOS itself — from Part B onwards it is accounts, code, and containers.
 
@@ -105,3 +105,95 @@ The spectrogram is the reason it is in this project. Vowels appear as **strong d
 | Praat | 7.0 | hand-labelling vowel boundaries; reading TextGrids |
 
 **One thing that did not go to plan:** the Docker Desktop cask install failed when run non-interactively, because creating `/usr/local/bin` requires an administrator password and there was no terminal available to type it into. It was re-run by hand and succeeded. Worth knowing when setting up a second machine: Docker is the one Part A install that needs a password.
+
+---
+
+## Part B — Git, GitHub, and where this repository came from (completed 7 August 2026, MacBook "neo")
+
+Part B installs nothing. It establishes an identity, an authentication, and a repository. If you are reading this on a second machine, the practical content is Steps 9 and 10 — the repository itself already exists and you only need to clone it.
+
+### Step 9 — Git identity
+
+Every commit carries a name and an email, set once and used by every project on the machine:
+
+```bash
+git config --global user.name "Pedram Badakhchani"
+git config --global user.email "pb357@cam.ac.uk"
+git config --global init.defaultBranch main
+```
+
+The third line tells git to call the first branch of a new repository `main` rather than the older default `master`, which is what GitHub now expects.
+
+**Note for a second machine:** the first two may already be set from other work — check with `git config --global --list` before overwriting. Since this repository is public, the name and email in these settings appear permanently and publicly in every commit. That was a deliberate choice (research credibility), not an oversight.
+
+### Step 10 — SSH key: how the machine proves it is you
+
+GitHub needs to recognise the machine before it will accept a push. An SSH key is a matched pair of files: a **private** key that never leaves the machine, and a **public** key that is pasted into your GitHub account. GitHub then recognises anything signed by the private half.
+
+On this machine an `ed25519` key already existed and was reused. **One key per machine is the right arrangement** — a second key on the same machine adds nothing and gives you two things to manage.
+
+A machine with no key needs one created:
+
+```bash
+ssh-keygen -t ed25519 -C "pb357@cam.ac.uk"
+eval "$(ssh-agent -s)"
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+pbcopy < ~/.ssh/id_ed25519.pub
+```
+
+The public half is then on the clipboard; paste it at **github.com → Settings → SSH and GPG keys → New SSH key**, titled after the machine.
+
+Verification:
+
+```bash
+ssh -T git@github.com
+```
+
+Success looks like `Hi pedbad! You've successfully authenticated, but GitHub does not provide shell access.` **That sentence is the pass, even though the command exits with a non-zero code** — GitHub deliberately refuses shell access, so the connection always closes with an error status. Judge it by the greeting, not the exit code.
+
+### Steps 11–12 — Why this repository is a clone of another one
+
+The project was not started from an empty folder. It was created by cloning [`pedbad/langcen_base`](https://github.com/pedbad/langcen_base) — Pedram's own Django 5 + Tailwind v4 + ShadCN-Django starter — which already provides, tested: a custom user model with student, teacher and admin roles; complete authentication flows; automatic invite emails when an account is created; CSV seeding of a whole cohort; pre-commit hooks running Black and Ruff; a seventeen-test pytest suite; the Unfold admin theme; and the component UI. That is several weeks of work that did not need doing twice (Decision D7).
+
+The clone keeps the scaffold's full history, and the scaffold stays connected as a **second git remote** so improvements to it can be merged in later:
+
+```bash
+git clone git@github.com:pedbad/langcen_base.git persian-pronunciation
+cd persian-pronunciation
+git remote rename origin scaffold                                    # free up the name "origin"
+git remote add origin git@github.com:pedbad/persian-pronunciation.git
+git push -u origin main
+```
+
+The result is two remotes, and the distinction matters:
+
+| Remote | Points at | Used for |
+|---|---|---|
+| `origin` | `persian-pronunciation` | normal work — `git pull`, `git push` |
+| `scaffold` | `langcen_base` | pulling in future scaffold improvements: `git fetch scaffold && git merge scaffold/main` |
+
+The public GitHub repository was created through the website with **every initialisation checkbox left unticked** — no README, no licence, no `.gitignore`. A pre-filled repository creates a commit that has nothing in common with the scaffold's history, and the first push then fails.
+
+### Step 13 — Layout, and the folder-name swap
+
+The planning documents moved into `docs/`, so the repository root keeps the scaffold's clean layout. `memory/` sits at the root because it is the project's working memory rather than documentation. The scaffold's own README was preserved as `docs/scaffold-readme.md` and the project README took the root — two files cannot both be `README.md`. `HANDOVER.md` was duplicated as `CLAUDE.md` in the root, because Claude Code loads that filename automatically and the working protocol should not depend on remembering to paste it.
+
+The local folder was then renamed so that the project lives at `~/Sites/persian` while the GitHub repository remains `persian-pronunciation`. **The order of that rename is not cosmetic:** it must happen before Part C, because a Python virtual environment records its own absolute path internally and breaks if its parent folder is renamed afterwards. The same reason explains why a `venv/` must never be copied between machines — always create a fresh one.
+
+Two things were deliberately kept out of the repository, and remain out of it permanently: draft correspondence, and all native-speaker recording material including speaker identities and consent records. They live in `~/Sites/persian-private/`, which does not sync between machines. A frozen zip of the pre-swap documentation folder was archived there as well — deliberately a zip rather than a live folder, because a second *editable* copy of `DECISIONS.md` or `BUILD_PLAN.md` is how two machines silently end up working from different versions.
+
+### Conventions adopted during Part B
+
+- **No `Co-Authored-By` trailers** in commit messages. This is a public research repository and the history should read as the author's own.
+- **`.claude/` and `emails/` are git-ignored.** The first is per-machine tooling state that a plugin recreated inside the project root; the second is a safety net for correspondence that should never be committed.
+- **`git status` is run as its own command before any commit**, never chained into the commit itself. A stray file was committed and pushed once during Part B precisely because the status output arrived too late to act on.
+
+### What a second machine needs from Part B
+
+Only Steps 9 and 10 — identity and an SSH key. Then:
+
+```bash
+git clone git@github.com:pedbad/persian-pronunciation.git ~/Sites/persian
+```
+
+Nothing else in Part B is repeated. The full session-opening prompt for a fresh machine is in `docs/START_PROMPT.md`, version B.
