@@ -542,14 +542,36 @@ Dev topology (recorded as an amendment to D1 in DECISIONS.md): Django runs nativ
 ### Step 29 — Postgres, Redis, and the worker via docker compose
 **Goal:** The services the app needs, one command up, health-checked.
 **Design note (7 Aug 2026):** the worker should call MFA via its `align_one`/server mode, not a fresh `mfa align` per attempt — MFA's per-run startup (corpus validation, model loading) can push a cold alignment to 15–30+ seconds.
-**Do:** Create `Dockerfile.worker` (the engine image plus the web app's Python deps, so Celery can import Django):
+**Do — first, add the three new dependencies to the project properly** (D10: nothing is installed that the lockfile does not record):
+```bash
+uv add celery redis "psycopg[binary]"
+```
+That updates `pyproject.toml` and `uv.lock` together. Do **not** install them inside the Dockerfile instead — that is exactly the unpinned hole D10 closed.
+
+Then create `Dockerfile.worker` (the engine image plus the web app's Python dependencies, so Celery can import Django):
 ```dockerfile
 FROM persian-mfa
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt celery redis psycopg[binary]
+
+# uv, version-pinned — nothing in this project installs "whatever is newest today"
+COPY --from=ghcr.io/astral-sh/uv:0.11.26 /uv /usr/local/bin/uv
+
+# Build the environment OUTSIDE /app. compose bind-mounts the repository over
+# /app, which would otherwise hide the image's .venv behind the Mac's own —
+# a macOS venv that cannot run in a Linux container. See "If it fails" below.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+
+WORKDIR /app
+COPY pyproject.toml uv.lock .python-version ./
+
+# --frozen: fail loudly if uv.lock is out of date, rather than quietly
+#           re-resolving and building an environment nobody recorded.
+# --no-dev: the worker needs runtime dependencies only.
+RUN uv sync --frozen --no-dev
+
 WORKDIR /app/src
-CMD ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
+CMD ["uv", "run", "--frozen", "celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
 ```
+Also add `.venv/` and `node_modules/` to `.dockerignore` if they are not already there, so the Mac's environment is never copied into an image.
 …and `docker-compose.yml` with services `db` (postgres:16, env from `.env`, volume), `redis` (redis:7), `worker` (build: Dockerfile.worker, mounts the repo, env from `.env`, depends_on db+redis). Add to `.env`: `POSTGRES_DB=persian`, `POSTGRES_USER=persian`, `POSTGRES_PASSWORD=<generate one>`, `DATABASE_URL=postgres://persian:<password>@127.0.0.1:5432/persian`, `CELERY_BROKER_URL=redis://127.0.0.1:6379/0`. Point Django's settings at `DATABASE_URL`/`CELERY_BROKER_URL` (with the scaffold's sqlite as fallback when unset), add `src/config/celery.py` (standard Celery-Django boilerplate), then:
 ```bash
 docker compose up -d db redis
@@ -557,7 +579,7 @@ python src/manage.py migrate
 docker compose up -d --build worker
 ```
 **✅ Check (three):** `docker compose ps` shows db and redis `running`; `migrate` applies cleanly against Postgres; `docker compose logs worker | tail -5` ends with `celery@… ready.`
-**If it fails:** Port 5432 already in use → another Postgres is running (`brew services list`). Worker import errors → `Dockerfile.worker` didn't install requirements.txt.
+**If it fails:** Port 5432 already in use → another Postgres is running (`brew services list`). Worker import errors → the three dependencies were never added with `uv add`, so they are not in `uv.lock`; check `uv.lock` mentions celery before rebuilding. `uv sync --frozen` failing during the build → `uv.lock` is stale; run `uv lock` on the Mac, commit it, rebuild. Worker starts but cannot find its packages → the bind mount is shadowing the environment; confirm `UV_PROJECT_ENVIRONMENT=/opt/venv` is set and that `.venv/` is in `.dockerignore`.
 
 ### Step 30 — The pronunciation models
 **Goal:** The database schema from the Phase 2 architecture doc — hardened exactly as reviewed.
