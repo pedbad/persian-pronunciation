@@ -44,10 +44,10 @@ ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.
 # Site identity (fork-friendly: env-driven; no hard-coded brand/domain defaults)
 _default_origin = "http://127.0.0.1:8000" if ENV == "dev" else ""
 SITE_ORIGIN = os.getenv("SITE_ORIGIN", _default_origin)
-SITE_NAME = os.getenv("SITE_NAME", "LangCen Base")
+SITE_NAME = os.getenv("SITE_NAME", "Persian Pronunciation")
 SITE_DESCRIPTION = os.getenv(
     "SITE_DESCRIPTION",
-    "LangCon — a clean, accessible Django 5 + Tailwind v4 starter.",
+    "Vowel-by-vowel pronunciation feedback for Persian learners.",
 )
 
 
@@ -279,8 +279,8 @@ IMPORT_EXPORT_SKIP_ADMIN_LOG = False
 # Unfold (Admin) Branding
 # ----------------------------------------------------------------------
 UNFOLD = {
-    "SITE_TITLE": "LangCen Admin",
-    "SITE_HEADER": "LangCen Admin",
+    "SITE_TITLE": "Persian Pronunciation Admin",
+    "SITE_HEADER": "Persian Pronunciation Admin",
     # "SITE_URL": "/admin/",
     # 1) where "View site" should go:
     "SITE_URL": "/",  # your main site root (or full URL)

@@ -363,22 +363,22 @@ import sys
 def transcribe_with_timestamps(audio_path):
     """
     Transcribe a Persian audio file and return word-level timestamps.
-    
+
     whisper.load_model("medium") loads a 769MB model that balances
     speed and accuracy. For production use "large-v3" (2.9GB) for
     better Persian accuracy. For quick testing use "small" (244MB).
     """
-    
+
     # Load the model — this downloads it on first run, then caches locally
     model = whisper.load_model("medium")
-    
+
     result = model.transcribe(
         audio_path,
         language="fa",           # fa = Farsi / Persian
         word_timestamps=True,    # this is what gives us timing data
         verbose=False            # set to True to see progress during transcription
     )
-    
+
     # Extract word-level timing from the nested segment structure
     words = []
     for segment in result["segments"]:
@@ -388,7 +388,7 @@ def transcribe_with_timestamps(audio_path):
                 "start": round(word["start"], 3),  # seconds, 3 decimal places
                 "end":   round(word["end"],   3)
             })
-    
+
     return {
         "text":     result["text"].strip(),
         "language": result["language"],
@@ -444,7 +444,7 @@ from aeneas.task import Task
 def align_phonemes(audio_path, transliteration, output_path):
     """
     Use aeneas to find the timestamp of each character in a transliteration.
-    
+
     How it works:
     1. Write each character to a text file, one per line (these are the "fragments")
     2. Configure aeneas with the language and file paths
@@ -452,33 +452,33 @@ def align_phonemes(audio_path, transliteration, output_path):
     4. It then finds where each synthesised fragment appears in the real audio
     5. The result is a sync map: fragment → time range
     """
-    
+
     # Write each character as a separate fragment for aeneas
     text_path = "/tmp/proto_text.txt"
     with open(text_path, "w", encoding="utf-8") as f:
         for char in transliteration.replace(" ", ""):
             f.write(char + "\n")
-    
+
     # aeneas configuration string — pipe-separated key=value pairs
     config_string = (
         "task_language=fa|"       # fa = Farsi/Persian
         "is_text_type=plain|"     # plain text, one fragment per line
         "os_task_file_format=json" # output as JSON
     )
-    
+
     task = Task(config_string=config_string)
     task.audio_file_path_absolute = os.path.abspath(audio_path)
     task.text_file_path_absolute  = os.path.abspath(text_path)
     task.sync_map_file_path_absolute = os.path.abspath(output_path)
-    
+
     # Execute the alignment
     ExecuteTask(task).execute()
     task.output_sync_map_file()
-    
+
     # Read and parse the result
     with open(output_path, "r", encoding="utf-8") as f:
         sync_map = json.load(f)
-    
+
     # Convert to a simple list of {char, start, end}
     fragments = []
     for frag in sync_map.get("fragments", []):
@@ -488,7 +488,7 @@ def align_phonemes(audio_path, transliteration, output_path):
             "start": float(frag["begin"]),
             "end":   float(frag["end"])
         })
-    
+
     return fragments
 
 if __name__ == "__main__":
@@ -914,7 +914,7 @@ failed = 0
 for lesson_path, native_audio_path, learner_audio_path in lessons:
     name = os.path.basename(lesson_path)
     print(f"\n--- Testing {name} ---")
-    
+
     try:
         # Check schema completeness
         lesson = json.load(open(lesson_path))
@@ -929,16 +929,16 @@ for lesson_path, native_audio_path, learner_audio_path in lessons:
             assert 0 <= position < len(transliteration)
             assert transliteration[position] == entry["vowel"]
         print(f"  Schema:  PASSED — {len(lesson['vowel_map'])} vowels defined")
-        
+
         # Run the full scoring pipeline
         result = score_pronunciation(lesson_path, native_audio_path, learner_audio_path)
         assert 0 <= result["overall_score"] <= 100
         assert len(result["waveform_annotations"]) > 0
-        
+
         print(f"  Scoring: PASSED — overall score {result['overall_score']}")
         print(f"  Output:  {len(result['waveform_annotations'])} vowel regions annotated")
         passed += 1
-        
+
     except AssertionError as e:
         print(f"  FAILED — assertion error: {e}")
         failed += 1

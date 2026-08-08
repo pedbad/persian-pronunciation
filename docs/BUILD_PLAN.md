@@ -35,9 +35,9 @@ Two authentications are built and verified along the way: **GitHub** (SSH keys, 
 
 **Part C — Scaffold running + app login proven**
 - [x] 14. Python env (uv), npm install, database, dev server
-- [ ] 15. Scaffold's tests and git hooks pass
-- [ ] 16. Admin login works (superuser)
-- [ ] 17. Learner invite flow works end to end
+- [x] 15. Scaffold's tests and git hooks pass
+- [x] 16. Admin login works (superuser)
+- [x] 17. Learner invite flow works end to end
 - [ ] 18. CSV student seeding works (pilot onboarding path)
 - [ ] 18b. `pwa-asset-generator` removed; `npm audit` quiet (D12)
 
@@ -354,28 +354,38 @@ pre-commit run --all-files
 **Goal:** Your own admin account in the scaffold's Unfold admin.
 **Do:**
 ```bash
-python src/manage.py createsuperuser
+uv run python src/manage.py createsuperuser
 ```
 (email `pb357@cam.ac.uk`, choose a strong password — this account can do anything.)
+Run this yourself in a second terminal: it prompts for a password interactively, and the
+dev server must keep running in the first tab.
 **✅ Check:** Visit **http://127.0.0.1:8000/admin/** and log in. You should see the styled admin with a Users section.
 **If it fails:** Wrong URL or server not running — the `npm run dev` tab must still be alive.
 
 ### Step 17 — The learner invite flow: authentication #2, end to end
 **Goal:** Prove how pilot learners will actually get accounts: an admin creates a user → the scaffold automatically emails them a set-password link → they set a password → they log in. In development, "emails" are files in `tmp_emails/`, so the whole loop is testable offline.
 **Do:**
-1. In the admin, add a user: email `teststudent@example.com`, role student, *not* staff.
+1. Logged in as an admin, go to **http://127.0.0.1:8000/users/register/** and add a user: email `teststudent@example.com`, role student.
+
+   The form still demands a password and a confirmation. Type anything valid — it is **discarded**. `RegisterForm` inherits `password1`/`password2` from Django's `UserCreationForm`, where they are declared on the form class rather than in `Meta.fields`, so narrowing `fields` to `("email",)` does not remove them; `RegisterView.form_valid()` then calls `set_unusable_password()` on the saved user regardless. Functional, but wrong for onboarding a cohort — see the note below.
+
+   **Not** Django admin's *Add user* page. The scaffold has two deliberate creation paths, and only one invites (`src/users/signals.py`, `send_invite_on_create`): the signal skips any new user who already has a usable password. Django admin's `AdminUserAddForm` *requires* password1/password2, so it sets one and suppresses the invite; `/users/register/` uses `RegisterForm` and calls `set_unusable_password()`, so the invite fires. Use the admin page and no email will ever appear, with nothing to indicate why.
+
+   Keep to `@example.com` — RFC 2606 reserves it, so a stray development email can never reach a real person. Never use a real address here; if `EMAIL_BACKEND` is later switched to SMTP, any such row becomes a live email.
 2. In Terminal: `ls -t tmp_emails/ | head -1` — then `open tmp_emails/<that-file>`.
 3. In the email text, copy the `/users/reset/<uid>/<token>/` link, paste it into the browser, set a password.
 4. Log out of admin (or use a private window) and log in at **http://127.0.0.1:8000/users/login/** as the student.
 **✅ Check (four):** the invite email file exists; the link opens a set-password page; the password saves; the student login succeeds and redirects to the student view. Logout works too (it's a POST button, not a link — by design in Django 5).
-**If it fails:** No email file → `EMAIL_FILE_PATH` in `.env` is wrong or the folder can't be created; check for typos and that the invite signal only fires for non-staff users (it does — creating a superuser sends nothing).
+**Known wart (8 August 2026):** `/users/register/` asks the admin for a password it then throws away. Harmless for one test user, wrong for onboarding a CULP cohort. The fix is to drop `password1`/`password2` from `RegisterForm` and let `set_unusable_password()` stand alone; the scaffold's own test suite is the check. Fix it here, then consider offering it back to `langcen_base` through the `scaffold` remote (D7).
+
+**If it fails:** No email file, and `tmp_emails/` does not exist at all → nothing was ever sent. Django's filebased backend creates that folder on its first send, so a missing folder is the symptom, not the cause. In order of likelihood: (a) the user was created through Django admin's *Add user* page rather than `/users/register/`, so it has a usable password and the invite was skipped — check with `has_usable_password()`; (b) `EMAIL_FILE_PATH` in `.env` is wrong; (c) the user is a superuser or staff, which the signal also skips.
 
 ### Step 18 — CSV seeding: the pilot onboarding path
 **Goal:** Next term you'll onboard a whole CULP cohort at once. The scaffold ships exactly this. Prove it now with its sample file.
 **Do:**
 ```bash
-python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123! --dry-run
-python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123!
+uv run python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123! --dry-run
+uv run python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123!
 ```
 **✅ Check:** Dry-run lists what *would* be created without touching the database; the real run creates the users — confirm they appear in the admin Users list (and invite emails appeared in `tmp_emails/`).
 **If it fails:** CSV format errors are printed row by row; the sample file should pass as-is.
