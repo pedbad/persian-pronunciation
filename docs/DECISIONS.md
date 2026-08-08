@@ -15,6 +15,8 @@ How to change a decision: add a new dated entry underneath the old one — never
 | D7 | Public GitHub repo, built from the `pedbad/langcen_base` scaffold (kept as a second remote) | ✅ Agreed 7 Jul 2026 |
 | D8 | Learner accounts via the scaffold's invite-email flow (admin-created / CSV-seeded; no open signup) | ✅ Agreed 7 Jul 2026 |
 | D9 | Two native references per lesson: score against both, keep the better result; `NativeReference` table; playback uses the winning voice | ✅ Agreed 7 Aug 2026 |
+| D10 | uv is the Python toolchain: `pyproject.toml` + `uv.lock` are the source of truth, `.venv`, `requirements*.txt` retired | ✅ Agreed 8 Aug 2026 |
+| D11 | Dependency version policy: track the Django 5.2 LTS line through the pilot; LTS→LTS to 6.2 afterwards; third-party bumps one at a time, gated on the test suite | ✅ Agreed 8 Aug 2026 |
 
 ---
 
@@ -115,3 +117,65 @@ How to change a decision: add a new dated entry underneath the old one — never
 **Why:** MFCC+DTW against a single voice conflates pronunciation quality with voice identity (gap review §2.2) — a learner must never score worse because their vocal tract differs from the reference speaker's. Scoring against both natives and keeping the better result is the cheapest honest mitigation, and the data is already free: the test kit records native-A and native-B anyway (BUILD_PLAN Step 19). Best-of beats averaging, because averaging drags a good match to one voice down by the mismatch to the other — punishing exactly the case dual references exist to protect. Playing back the winning reference means the learner imitates the voice their score was actually measured against, which is also the voice closest to their own range.
 
 **Consequences:** Roughly double the alignment/DTW compute per attempt (two single-word alignments — cheap; Step 32's latency measurement captures the real cost). The Phase 2 models change: `Lesson.native_reference_audio` becomes the `NativeReference` table (BUILD_PLAN Step 30); seeding attaches both recordings (Step 31); the payload gains the winning reference id and its segment times (Steps 32–34). FABLE_REVIEW Step 15's escalation (b) is now the default rather than a repair. Two guard rails: a clip used as test input is **never** scored against itself (when native-B is the input, native-B leaves the reference set), and Step 10's score matrix deliberately scores against native-A alone so the native-B killer test stays fair.
+
+---
+
+## D10 — uv as the Python toolchain (8 August 2026)
+
+**What:** Python dependencies and the Python interpreter itself are managed by **uv** (Astral). Concretely:
+
+- `pyproject.toml` — which already exists in this repository for Black and Ruff configuration — gains a `[project]` section holding the runtime dependencies and a `[dependency-groups] dev` group for the development tools.
+- **`uv.lock` is committed to the repository** and is the authoritative record of exactly which packages, at which versions, with which file hashes, get installed. It includes transitive dependencies, which no `requirements.txt` in this project ever recorded.
+- The virtual environment is **`.venv`** — uv's convention. `.gitignore` already covers both `.venv/` and `venv/`, so nothing needs changing there.
+- `requirements.txt` and `requirements-dev.txt` are **deleted**, but only after the scaffold's test suite passes against the migrated environment (see Consequences).
+- The interpreter is pinned by the existing `.python-version` (3.13.3) and provisioned by uv, so every machine and every container runs the same Python.
+- `package.json`'s `dev` script changes from `python src/manage.py runserver` to `uv run python src/manage.py runserver`.
+- Setting up any machine becomes one command: **`uv sync`**.
+
+**Why — four reasons, in order of importance to this project:**
+
+1. **It makes D1 true rather than aspirational.** D1 promises that anyone can rebuild this project at any point in its history. `pip install -r requirements.txt` cannot deliver that here: the development requirements were entirely unpinned, transitive dependencies were unrecorded, and the same file installs different software each year. A lockfile records every package, direct and transitive, at an exact version with a hash — so a rebuild either reproduces the environment precisely or fails loudly. For a project whose output is a paper, "here is the exact environment that produced these numbers" is a methods asset, not a convenience.
+2. **It closes a gap already flagged in the journal.** `Dockerfile.engine` (BUILD_PLAN Step 21) pins nothing — `pip install openai-whisper librosa …` installs whatever is newest on the day. The same lock discipline applies inside the engine image, and the engine is precisely where reproducibility matters most, because the boundary and score numbers reported in the paper come out of it.
+3. **It enforces an interpreter pin that was previously decorative.** `.python-version` says 3.13.3 and nothing enforced it; the two machines had already drifted (abacus 3.13.3, neo 3.13.15). uv reads that file and provisions the exact interpreter everywhere, including in containers.
+4. **It consolidates on tooling already in use.** Ruff — from the same authors — already runs in this repository's pre-commit hooks.
+
+**Consequences:**
+
+- **A deliberate divergence from the scaffold.** `langcen_base` (D7) stays pip-based. Code merges from the `scaffold` remote continue to work normally; *dependency files* will conflict and must be reconciled by hand. This is accepted: the scaffold has served its purpose and this application is expected to evolve away from it. The `scaffold` remote stays connected regardless — it costs nothing.
+- **One rule, never broken:** `uv.lock` is generated, never hand-edited. Dependencies change through `uv add` / `uv remove`, which update `pyproject.toml` and the lock together.
+- **The migration has an acceptance test.** The scaffold's 17-test pytest suite (BUILD_PLAN Step 15) is run immediately after the switch. Green means the translation from requirements files into `pyproject.toml` was faithful. Only then are `requirements.txt` and `requirements-dev.txt` deleted, so there is never a period in which two sources of truth coexist unnoticed.
+- **`npm run dev` gains a failure mode fewer.** Because the script now calls `uv run`, it finds `.venv` without activation. The old "`(venv)` must show in your prompt" trap disappears.
+- **Documents updated in the same commit:** BUILD_PLAN (a new Part A step installing uv; Step 14 rewritten; Steps 21 and 35 adjusted), `memory/SETUP_LOG.md`, `README.md`, `CLAUDE.md`. Superseded wording in the D1 amendment and in older JOURNAL entries is **left as written** — this log never rewrites history, and D10 supersedes it.
+- **No `scorer_version` impact.** This changes how the environment is built, not how attempts are scored.
+- **The second machine needs no cleanup.** Part C had not been run on any machine when this was decided, so no virtual environment or installed packages existed anywhere to migrate. MacBook "neo" picks this up by pulling the repository and following the rewritten Step 14.
+
+---
+
+## D11 — Dependency version policy: the Django 5.2 LTS line through the pilot (8 August 2026)
+
+**What:** The project tracks **Django's 5.2 LTS line** through the Michaelmas 2026 pilot and the calibration study that follows it. `pyproject.toml` states the intent as `>=5.2,<5.3`; `uv.lock` records the exact patch release actually used. Security patches within the line are adopted deliberately, by an explicit `uv lock --upgrade-package django`, not silently at install time. The next planned Django move is **LTS to LTS — 5.2 to 6.2** — after the pilot, when 6.2 is released (expected April 2027). Third-party dependencies are bumped **one at a time**, each bump gated on the scaffold's pytest suite passing, and never in the same change as a toolchain or framework migration.
+
+Versions observed on PyPI on 8 August 2026, when this decision was taken:
+
+| Package | Pinned here | Latest available |
+|---|---|---|
+| Django | 5.2.17 (via the 5.2 LTS line) | 6.1, released 5 Aug 2026 |
+| django-cotton | 2.1.3 | 2.7.2 |
+| django-unfold | 0.67.0 | 0.103.0 |
+| django-import-export | 4.3.10 | 4.4.1 |
+| python-dotenv | 1.1.1 | 1.2.2 |
+
+**Why:**
+
+1. **5.2 is LTS, with security support until April 2028** — comfortably past the pilot, the calibration study, and writing up.
+2. **Django 6.1 was three days old when this was decided, and is a feature release.** Its mainstream support ends when 6.2 arrives (~April 2027), so adopting it would force an upgrade *during or immediately after* the pilot term. Django's designed upgrade path is LTS to LTS; 6.1 as a stepping stone buys nothing and costs a migration.
+3. **Third-party compatibility is unproven, not proven.** `django-cotton` and `django-unfold` are small projects, and the scaffold's UI sits directly on both. Three days after a Django major release, "works with 6.1" means untested. The worst possible time to discover otherwise is week three of term.
+4. **A research artefact benefits from a stated, stable environment.** The environment is something the paper reports; changing it mid-study costs more than the features gained.
+
+**Consequences:**
+
+- **This repository knowingly runs a Django that is not the newest.** That is deliberate and now recorded, so nobody — including a future developer or a reviewer — reads it as neglect.
+- **Every Django security-release day requires a decision, not a reflex.** One reviewable command inside the 5.2 line; cheap, and visible in the lockfile diff.
+- **`django-unfold` 0.67 → 0.103 is its own future step.** Unfold moves quickly and has changed admin templates between minor versions, and the scaffold's admin theming depends on it directly.
+- **The 6.2 upgrade belongs to Phase 6 planning or later**, after the pilot has produced its evidence.
+- **No `scorer_version` impact.** No scoring behaviour changes here.
