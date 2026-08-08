@@ -6,7 +6,7 @@
   "scripts": {
     "tw:build": "tailwindcss -i src/core/static/core/css/input.css -o src/core/static/core/css/output.css -m",
     "tw:watch": "tailwindcss -i src/core/static/core/css/input.css -o src/core/static/core/css/output.css -w",
-    "dev": "concurrently -k \"npm:tw:watch\" \"python src/manage.py runserver\""
+    "dev": "concurrently -k \"npm:tw:watch\" \"uv run python src/manage.py runserver\""
   },
   "repository": {
     "type": "git",

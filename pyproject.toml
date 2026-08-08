@@ -1,5 +1,34 @@
 # pyproject.toml
 
+[project]
+name = "persian-pronunciation"
+version = "0.1.0"
+description = "Persian pronunciation scoring for language learners: vowel-by-vowel feedback against native references."
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "django-cotton==2.1.3",
+    "django-unfold==0.67.0",
+    "django-import-export==4.3.10",
+    "python-dotenv==1.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit",
+    "black",
+    "ruff",
+    "pytest",
+    "pytest-django",
+    "django-browser-reload",
+    "django-extensions",
+]
+
+[tool.uv]
+# This repository is an application, not an installable library — there is no
+# package under src/ to build. Without this, `uv sync` would try to build one.
+package = false
+
 [tool.black]
 line-length = 100
 target-version = ["py313"]

@@ -96,3 +96,6 @@ data/*.csv
 # ---- never in the public repo ----
 # Draft correspondence lives outside the repository (see docs/BUILD_PLAN.md Step 13).
 emails/
+
+# Local demo credentials — never committed (public repo)
+passwords.txt

@@ -73,7 +73,7 @@
         </li>
         <li class="flex gap-2">
           {% icon 'package' class_='mt-0.5 h-4 w-4 shrink-0' %}
-          <span><strong>Install deps</strong>: <code>pip install -r requirements*.txt</code> (and <code>npm install</code> if using Tailwind build/watch).</span>
+          <span><strong>Install deps</strong>: <code>uv sync</code> (and <code>npm install</code> if using Tailwind build/watch).</span>
         </li>
         <li class="flex gap-2">
           {% icon 'settings' class_='mt-0.5 h-4 w-4 shrink-0' %}
@@ -81,7 +81,7 @@
         </li>
         <li class="flex gap-2">
           {% icon 'db' class_='mt-0.5 h-4 w-4 shrink-0' %}
-          <span><strong>Migrate & create a superuser</strong>: <code>python src/manage.py migrate</code> then <code>createsuperuser</code>.</span>
+          <span><strong>Migrate & create a superuser</strong>: <code>uv run python src/manage.py migrate</code> then <code>createsuperuser</code>.</span>
         </li>
         <li class="flex gap-2">
           {% icon 'brush' class_='mt-0.5 h-4 w-4 shrink-0' %}

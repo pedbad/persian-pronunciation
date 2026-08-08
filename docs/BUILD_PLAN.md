@@ -24,6 +24,7 @@ Two authentications are built and verified along the way: **GitHub** (SSH keys, 
 - [x] 6. Docker Desktop
 - [x] 7. ffmpeg
 - [x] 8. Praat + pre-commit
+- [x] 8b. uv — the Python toolchain (D10)
 
 **Part B — Git, GitHub authentication, the repo**
 - [x] 9. Git knows who you are
@@ -33,11 +34,12 @@ Two authentications are built and verified along the way: **GitHub** (SSH keys, 
 - [x] 13. Project docs moved into the repo (folder-swap variant done: repo root is `~/Sites/persian`)
 
 **Part C — Scaffold running + app login proven**
-- [ ] 14. Python env, npm install, database, dev server
+- [x] 14. Python env (uv), npm install, database, dev server
 - [ ] 15. Scaffold's tests and git hooks pass
 - [ ] 16. Admin login works (superuser)
 - [ ] 17. Learner invite flow works end to end
 - [ ] 18. CSV student seeding works (pilot onboarding path)
+- [ ] 18b. `pwa-asset-generator` removed; `npm audit` quiet (D12)
 
 **Part D — Audio kit and ground truth**
 - [ ] 19. 12 test recordings, correct format
@@ -184,6 +186,21 @@ pre-commit --version
 ```
 Expected: Praat opens (two windows: *Objects* and *Picture* — close them), and a `pre-commit 4.x` version line.
 **If it fails:** If macOS blocks Praat ("unidentified developer"): System Settings → Privacy & Security → Open Anyway.
+
+### Step 8b — uv, the Python toolchain (Decision D10, 8 August 2026)
+**Goal:** One tool that creates the virtual environment, installs the packages, records exactly what it installed (`uv.lock`), and provisions the pinned Python interpreter itself. It replaces `venv` + `pip` everywhere in this project. See D10 in `DECISIONS.md` for why, and `memory/SETUP_LOG.md` for the plain-English version.
+**Do:**
+```bash
+brew install uv
+```
+**✅ Check:**
+```bash
+uv --version
+```
+Expected: a version line such as `uv 0.11.x`.
+**If it fails:** `brew update && brew install uv`; reopen Terminal so the new command is found.
+
+> **A note on Step 4.** Homebrew's Python is still worth having on the Mac for odd one-off scripts, but the project no longer depends on it: uv reads `.python-version` (3.13.3) and downloads that exact interpreter itself. This is why the two machines' differing Pythons (abacus 3.13.3, neo 3.13.15) stopped mattering.
 
 > **Part A complete.** Your Mac has every tool the whole project needs. Nothing below installs anything new on the Mac itself — from here it's accounts, code, and containers.
 
@@ -362,6 +379,18 @@ python src/manage.py seed_students data/sample_students.csv --default-password=C
 ```
 **✅ Check:** Dry-run lists what *would* be created without touching the database; the real run creates the users — confirm they appear in the admin Users list (and invite emails appeared in `tmp_emails/`).
 **If it fails:** CSV format errors are printed row by row; the sample file should pass as-is.
+
+### Step 18b — Remove `pwa-asset-generator` (Decision D12, 8 August 2026)
+**Goal:** A quiet `npm audit`. A fresh `npm install` reports 15 advisories, 11 high and 4 critical — and 12 of them, including every critical one, come through this one package, which bundles a headless Chrome (`puppeteer-core`) and its proxy stack. It is a one-shot icon generator that no npm script ever runs. The point is not the vulnerabilities themselves (all dev-only, none reaching a browser) but keeping `npm audit` output worth reading. Full reasoning: D12 in `DECISIONS.md`.
+**Do:**
+```bash
+npm uninstall pwa-asset-generator
+npm install
+npm audit
+```
+The fourteen icon files in `src/core/static/core/favicon/` are committed static assets and are **not** affected — nothing about the app's appearance changes. When branding is next redone, regenerate them with a one-off `npx pwa-asset-generator …` (see README) rather than reinstalling the dependency.
+**✅ Check (three, all must hold):** `npm audit` drops from 15 advisories to roughly 3 (`nanoid` via `postcss`, `picomatch` via `@tailwindcss/cli` — these belong to D11's one-at-a-time policy, *not* to `npm audit fix`); `uv run pytest -q` still reports **17 passed**; and `npm run dev` still serves the styled landing page with a working theme toggle. **Then add the regeneration command to README.md (the D1 rule) and commit.**
+**If it fails:** Revert with `git checkout package.json package-lock.json && npm install` — the lockfile is in git, so this is fully reversible. Do **not** reach for `npm audit fix`: it rewrites the lockfile wholesale, which is exactly what D11 forbids.
 
 > **Part C complete — authentication #2 done.** The web app runs, both logins are proven, hooks and tests are green. Commit anything you changed (`git add -A && git commit -m "Configure dev environment" && git push`). Everything so far was the scaffold doing its job — now we build what's new.
 

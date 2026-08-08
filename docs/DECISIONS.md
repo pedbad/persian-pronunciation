@@ -17,6 +17,7 @@ How to change a decision: add a new dated entry underneath the old one — never
 | D9 | Two native references per lesson: score against both, keep the better result; `NativeReference` table; playback uses the winning voice | ✅ Agreed 7 Aug 2026 |
 | D10 | uv is the Python toolchain: `pyproject.toml` + `uv.lock` are the source of truth, `.venv`, `requirements*.txt` retired | ✅ Agreed 8 Aug 2026 |
 | D11 | Dependency version policy: track the Django 5.2 LTS line through the pilot; LTS→LTS to 6.2 afterwards; third-party bumps one at a time, gated on the test suite | ✅ Agreed 8 Aug 2026 |
+| D12 | Remove `pwa-asset-generator` at the end of Part C (new Step 18b); regenerate PWA icons on demand with `npx` | ✅ Agreed 8 Aug 2026 |
 
 ---
 
@@ -179,3 +180,27 @@ Versions observed on PyPI on 8 August 2026, when this decision was taken:
 - **`django-unfold` 0.67 → 0.103 is its own future step.** Unfold moves quickly and has changed admin templates between minor versions, and the scaffold's admin theming depends on it directly.
 - **The 6.2 upgrade belongs to Phase 6 planning or later**, after the pilot has produced its evidence.
 - **No `scorer_version` impact.** No scoring behaviour changes here.
+
+---
+
+## D12 — Remove `pwa-asset-generator`; regenerate PWA icons on demand (8 August 2026)
+
+**What:** `pwa-asset-generator` is removed from `package.json`'s `devDependencies` at the **end of Part C — a new BUILD_PLAN Step 18b**, after Step 18 and before Part D. The fourteen icon files it produced (`src/core/static/core/favicon/`) are committed static assets and **stay exactly where they are**; nothing about the app's appearance changes. When branding is next redone, the tool is run once via `npx pwa-asset-generator …` without being carried in the project, and README records that command.
+
+**Why:** Discovered while running `npm install` during Step 14. A fresh install reports **15 advisories, 11 high and 4 critical** — and **12 of them, including every critical one, arrive through this single package**, which bundles `puppeteer-core` (a headless Chrome) and its proxy stack: `basic-ftp`, `ip-address`, `js-cookie`, `glob`, `brace-expansion`, `minimatch`. The remaining three are `nanoid` (via `postcss`) and `picomatch` (via `@tailwindcss/cli`).
+
+The vulnerabilities themselves are **not** the argument. `package.json` declares no runtime `dependencies` at all — every one of these is a development tool, none reaches a learner's browser, and the only browser-facing output of the JavaScript toolchain is the compiled `output.css`. The advisory classes (ReDoS, path traversal, SSRF) describe tools processing hostile input; here they process Pedram's own CSS and his own icon source image. No npm script invokes the generator, so it never runs during `npm run dev` or the test suite.
+
+The actual argument is **signal preservation**. Left alone, every `npm install` on every machine, for the remaining year of this project, prints "11 high, 4 critical". Noise that has been consciously decided-to-ignore is indistinguishable from noise not yet read — so the day a genuinely serious advisory appears in that output, it will scroll past unexamined. Clearing it keeps `npm audit` usable as a signal. Secondarily, a pilot involving Cambridge students and a DPIA conversation is easier when "our dependency audit is clean" is a plain statement of fact.
+
+The tool is also the right shape for removal: it is a **one-shot generator**, not a build step. Carrying a headless Chrome permanently to support an operation performed perhaps twice in the project's life is a poor trade.
+
+**Why at the end of Part C, and not sooner or later:** not sooner, because D11 forbids bumping dependencies inside a toolchain migration, and Step 14 is exactly that. Not later, because nothing in Parts D, E or F depends on it, so deferring only means carrying the advisories — and the temptation to keep deferring — through the whole engine build. The end of Part C is also where the 17-test suite and a working `npm run dev` both exist as gates.
+
+**Consequences:**
+
+- `npm audit` should fall from 15 advisories to roughly 3. The residue (`nanoid`, `picomatch`) belongs to `postcss` and the Tailwind CLI and is handled under D11 — one package at a time, gated on tests — not by `npm audit fix` sweeping the lockfile.
+- **The gate for Step 18b:** `npm install` clean, `uv run pytest -q` still 17 passed, and `npm run dev` still serving a styled page. If any fails, the removal is reverted — `package-lock.json` is in git.
+- **A second deliberate divergence from the scaffold** (after D10). `langcen_base` keeps the package. Merges from the `scaffold` remote may reintroduce it in `package.json`; reconcile by hand, same as the dependency files under D10.
+- **README gains one line** recording how to regenerate PWA assets, so removing the dependency does not remove the knowledge — the D1 rule applied to tooling rather than to the build.
+- **No `scorer_version` impact.** Nothing about scoring changes.
