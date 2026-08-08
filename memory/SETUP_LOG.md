@@ -197,3 +197,82 @@ git clone git@github.com:pedbad/persian-pronunciation.git ~/Sites/persian
 ```
 
 Nothing else in Part B is repeated. The full session-opening prompt for a fresh machine is in `docs/START_PROMPT.md`, version B.
+
+---
+
+## Parts A and B on the second machine — MacBook "abacus" (completed 8 August 2026)
+
+This section is the practical proof of the one above: a second Mac, set up from the repository alone. It took about an hour, and only three things actually needed doing.
+
+### What was already there
+
+git 2.55.0, the Xcode Command Line Tools, Homebrew 6.0.15, Python 3.13.3, node 22.19.0 with npm 10.9.3, and ffmpeg/ffprobe 8.1.2 — all present from other work. The lesson for a third machine is to **audit before installing**: a single read-only sweep of version strings answered the whole question in one command and avoided reinstalling six tools.
+
+### What had to be installed
+
+| Tool | Version | Notes |
+|---|---|---|
+| pre-commit | 4.6.1 | identical to neo; again pulled Homebrew's `python@3.14` as its own private runtime, which is unrelated to the project's Python |
+| Praat | 7.0 | identical to neo |
+| Docker Desktop | 29.6.2 (Compose v5.3.1) | **upgraded** from 20.10.23 / Compose v2.15.1 — an install from January 2023 |
+| uv | see the uv section below | new to the project as of Decision D10 |
+
+**Two failures worth recording, because a third machine will meet them.**
+
+*Praat did not respond to `open -a Praat` immediately after installing* — macOS had not yet indexed the new application in its app registry. The install was fine; `open /Applications/Praat.app` (by full path) worked, and the name lookup started working later on its own.
+
+*Docker Desktop crashed on every launch after the upgrade* — the icon bounced twice in the Dock and vanished. Its own log, at `~/Library/Containers/com.docker.docker/Data/log/host/com.docker.backend.log`, named the cause precisely:
+
+```
+loading/formatting settings-store.json: overriding "DisableHardwareAcceleration":
+recovered from panic: reflect: Call using zero Value argument
+```
+
+In plain terms: the new version read a settings file written by the 2023 version, found a value in a shape it did not expect, and died rather than ignoring it. The fix was to move **both** `settings-store.json` and `settings.json` aside as `.bak` in `~/Library/Group Containers/group.com.docker/`, then relaunch — Docker regenerated clean defaults and `docker run --rm hello-world` passed. Nothing of value is lost: those files hold preferences such as memory allocation, while images and volumes live elsewhere in the virtual machine's disk.
+
+Two practical notes attach to that fix. macOS privacy protection (TCC) blocks an assistant's shell from reading or writing `~/Library/Group Containers`, so this is a step the human runs. And `osascript -e 'quit app "Docker"'` hangs when the application being quit has already crashed — `pkill -f 'Docker.app'` is the reliable form.
+
+**The general lesson: upgrading a very old Docker Desktop in place is not free.** On a machine with a Docker install more than a year or two old, expect the stale-settings crash and budget ten minutes for it.
+
+### Part B on a second machine — what actually differed
+
+Steps 9 and 10 went as documented: the machine already had an `id_ed25519` key, GitHub accepted it, and `ssh -T git@github.com` returned the `Hi pedbad!` greeting. Two things did *not* match the documentation, both a consequence of cloning by hand rather than following Steps 11–12:
+
+- **`origin` was HTTPS, not SSH.** A clone taken from the repository's web page uses `https://github.com/…`, which asks for a username and a personal access token on every push and ignores the SSH key entirely. Corrected with `git remote set-url origin git@github.com:pedbad/persian-pronunciation.git`.
+- **The `scaffold` remote was missing.** Remotes are per-clone; they do not travel. Without it, D7's `git fetch scaffold && git merge scaffold/main` cannot run on this machine. Corrected with `git remote add scaffold git@github.com:pedbad/langcen_base.git`.
+
+**A third difference, and the reason both machines now sign commits identically:** this machine's global git author name was `pedbad` while neo's was `Pedram Badakhchani`, which would have put two author names for one person into a public repository's history. Set with `git config --global user.name "Pedram Badakhchani"`. Worth checking on any new machine before the first commit, not after.
+
+**The folder rename was done first, before anything else.** The clone landed at `~/Sites/persian-pronunciation` and was renamed to `~/Sites/persian` while the repository contained no virtual environment at all. This is the ordering rule from Step 13 above, and this session is the case it was written for.
+
+### uv — the Python toolchain (Decision D10, 8 August 2026)
+
+**Installed:** uv, via Homebrew. **What it is:** a single tool that replaces four — it creates the virtual environment, installs packages, records exactly what it installed, and provisions the Python interpreter itself.
+
+**Why the project adopted it, in one sentence:** `pip install -r requirements.txt` cannot rebuild the same environment twice, and Decision D1 promises exactly that.
+
+Slightly longer. A `requirements.txt` is a *shopping list*: it names some packages, often loosely, and says nothing about the packages those packages depend on. Install from it a year apart and you get different software, with nothing recording the difference. This project's development requirements were entirely unpinned. A **lockfile** — `uv.lock`, committed to the repository — is the *receipt* instead: every package that was actually installed, direct and transitive, at one exact version, with a cryptographic hash of the file that was downloaded. Installing from it either reproduces that environment precisely or fails loudly. For a project whose output is a paper reporting measurements, that is the difference between a reproducible result and a story about one.
+
+Three consequences worth knowing:
+
+- **The environment folder is now `.venv`**, uv's convention, not `venv`. `.gitignore` already covered both.
+- **`.python-version` finally means something.** It says 3.13.3 and nothing previously enforced it — abacus happened to have 3.13.3, neo has 3.13.15. uv reads that file and provisions the exact interpreter on every machine and inside containers.
+- **Setting up a machine is one command: `uv sync`.** It creates `.venv`, installs the locked versions, and removes anything not on the list.
+
+**The rule that keeps it honest:** `uv.lock` is generated, never hand-edited. Dependencies change through `uv add` / `uv remove`, which update `pyproject.toml` and the lock together.
+
+**Deliberately not adopted: bun in place of npm.** The same reasoning does not apply — `package-lock.json` already pins every JavaScript package with integrity hashes, so there is no reproducibility gap to close, and Node's only role in this project is compiling the Tailwind stylesheet. Adding a second JavaScript runtime would be a new tool on every machine in exchange for install speed the project does not need.
+
+### Part A summary table — abacus, 8 August 2026
+
+| Tool | abacus | neo | Note |
+|---|---|---|---|
+| git | 2.55.0 | 2.50.1 | |
+| Homebrew | 6.0.15 | 6.0.15 | |
+| Python | 3.13.3 | 3.13.15 | `.python-version` pins 3.13.3; uv now enforces it |
+| node / npm | 22.19.0 / 10.9.3 | 24.19.0 / 11.17.0 | **not pinned** — recorded here deliberately, so a future "the CSS looks different" question has a starting point |
+| Docker Desktop | 29.6.2 (Compose 5.3.1) | 29.6.2 (Compose 5.3.1) | upgraded from 20.10.23 on abacus |
+| ffmpeg / ffprobe | 8.1.2 | 8.1.2 | |
+| pre-commit | 4.6.1 | 4.6.1 | |
+| Praat | 7.0 | 7.0 | |
+| uv | installed 8 Aug 2026 | **not yet installed** | now a Part A tool (D10) |
