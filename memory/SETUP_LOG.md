@@ -261,6 +261,8 @@ Three consequences worth knowing:
 
 **The rule that keeps it honest:** `uv.lock` is generated, never hand-edited. Dependencies change through `uv add` / `uv remove`, which update `pyproject.toml` and the lock together.
 
+**Where the pinned interpreter actually came from — and a tool Part A never recorded.** On abacus, `uv sync` did not download Python at all: it found and reused an existing `~/.pyenv/versions/3.13.3` install. **pyenv is present on abacus**, was never mentioned in Part A, and is not a project dependency — it arrived with other work. It is recorded here only so that "uv provisioned the interpreter" is not read as "uv downloaded the interpreter" on every machine; uv will happily adopt a suitable interpreter it finds. On neo there was no 3.13.x match to adopt (neo has 3.13.15, the pin is 3.13.3), so uv downloaded a standalone CPython 3.13.3 — 14.9 MiB, a few seconds. Both routes end at the same pinned interpreter, which is the point of D10.
+
 **Deliberately not adopted: bun in place of npm.** The same reasoning does not apply — `package-lock.json` already pins every JavaScript package with integrity hashes, so there is no reproducibility gap to close, and Node's only role in this project is compiling the Tailwind stylesheet. Adding a second JavaScript runtime would be a new tool on every machine in exchange for install speed the project does not need.
 
 ### Part A summary table — abacus, 8 August 2026
@@ -275,4 +277,29 @@ Three consequences worth knowing:
 | ffmpeg / ffprobe | 8.1.2 | 8.1.2 | |
 | pre-commit | 4.6.1 | 4.6.1 | |
 | Praat | 7.0 | 7.0 | |
-| uv | installed 8 Aug 2026 | **not yet installed** | now a Part A tool (D10) |
+| uv | 0.11.26 | 0.12.2 | now a Part A tool (D10); already present on **both** machines, so neither actually installed it. `Dockerfile.worker` (BUILD_PLAN Step 29) pins 0.11.26 — that pin is the container's, deliberately independent of whatever each Mac happens to have |
+
+---
+
+## Part C on MacBook "neo" — 9 August 2026
+
+Neo had never run Part C. Nothing needed undoing; the environment was simply built for the first time, in D10 form. Every Part A tool was already present and matched the versions recorded above — including **uv 0.12.2**, which the row above previously recorded as "not yet installed" on neo. Auditing before installing paid for itself a second time.
+
+### npm 11 blocks package install scripts by default
+
+**The divergence:** neo runs **npm 11.17.0**; abacus runs **npm 10.9.3**. npm 11 added a supply-chain guard — it no longer runs a dependency's `install` / `postinstall` scripts unless the package is on an allow-list. On neo, `npm install` ends with:
+
+```
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @parcel/watcher@2.5.1 (install: node scripts/build-from-source.js)
+npm warn allow-scripts   @tailwindcss/oxide@4.1.13 (postinstall: node ./scripts/install.js)
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+```
+
+Abacus prints nothing of the sort, because npm 10 still runs those scripts silently.
+
+**Why it looks alarming and is not.** `@tailwindcss/oxide` is Tailwind v4's native compiler, so a skipped postinstall could plausibly leave the machine unable to build CSS — and an unstyled page is a confusing symptom to debug backwards. It was checked rather than assumed. Tailwind v4 ships its native binary as a **platform-specific optional dependency** (`@tailwindcss/oxide-darwin-arm64`, present in `node_modules/@tailwindcss/` after install), resolved by npm from the lockfile rather than fetched by the postinstall script. `npm run tw:build` therefore compiled the stylesheet in 87 ms with both scripts still unapproved. `@parcel/watcher` is a file-watching helper with the same arrangement — a prebuilt binary, with the blocked script being only a compile-from-source fallback.
+
+**The standing rule this establishes: do not run `npm approve-scripts` reflexively to silence the warning.** Approving install scripts is precisely the permission that supply-chain attacks on npm exploit, and this project needs neither of them. Check whether the build actually works first; here it does, so the correct action is to leave the scripts unapproved and let the warning stand.
+
+**For abacus, next time you work there:** nothing needs doing. Node and npm are deliberately **not pinned** in this project — they are recorded here instead, because the lockfile pins the Tailwind CLI itself and the compiled CSS does not vary by npm version. When abacus's npm is next upgraded to 11.x by other work, this same warning will appear; the note above is the answer to it. Upgrading abacus purely to match neo would buy nothing and is not recommended.

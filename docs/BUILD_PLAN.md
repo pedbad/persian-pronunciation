@@ -1,6 +1,6 @@
 # BUILD_PLAN — From an Empty Mac to a Working App, One Checked Step at a Time
 
-**Date:** 7 July 2026 · **Updated:** 7 August 2026 (D3 amendment, D9, tolerance and latency checks)
+**Date:** 7 July 2026 · **Updated:** 9 August 2026 (D10 pass: Steps 14, 15, 21, 29, 30, 32, 35 rewritten for uv; Step 18 corrected; Step 18b measured)
 **For:** Pedram (macOS — Apple Silicon or Intel)
 **Companion documents:** `FABLE_REVIEW.md` (the strategy), `DECISIONS.md` (the rules), `prototype/` (the design docs)
 **Scaffold:** [`pedbad/langcen_base`](https://github.com/pedbad/langcen_base) — your Django 5 + Tailwind v4 + ShadCN-Django starter, which already provides the app's authentication, git hooks, tests, and UI components.
@@ -38,8 +38,8 @@ Two authentications are built and verified along the way: **GitHub** (SSH keys, 
 - [x] 15. Scaffold's tests and git hooks pass
 - [x] 16. Admin login works (superuser)
 - [x] 17. Learner invite flow works end to end
-- [ ] 18. CSV student seeding works (pilot onboarding path)
-- [ ] 18b. `pwa-asset-generator` removed; `npm audit` quiet (D12)
+- [x] 18. CSV student seeding works (pilot onboarding path)
+- [x] 18b. `pwa-asset-generator` removed; `npm audit` quiet (D12)
 
 **Part D — Audio kit and ground truth**
 - [ ] 19. 12 test recordings, correct format
@@ -312,43 +312,64 @@ git push
 # Part C — Scaffold running + app login proven
 
 ### Step 14 — Bring the scaffold to life
-**Goal:** Python env, JS deps, environment file, database, dev server — the scaffold's own setup, each part checked.
-**Do (from your project root — `~/Sites/persian-pronunciation`, or `~/Sites/persian` if you did the Step 13 folder swap):**
+**Goal:** Python environment, JS build tools, environment file, database, dev server — each part checked.
+
+> **Rewritten 9 August 2026 for Decision D10.** This step used to create a `venv` and run `pip install -r requirements.txt -r requirements-dev.txt`. Those files were deleted when uv was adopted; that version of the step cannot be followed. `pyproject.toml` plus the committed `uv.lock` are now the source of truth, and one command builds the environment.
+
+**Do (from your project root — `~/Sites/persian`):**
 ```bash
-python3.13 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt -r requirements-dev.txt
-npm install
+uv sync
+```
+That is the whole Python setup. It creates `.venv`, installs exactly the versions recorded in `uv.lock`, and provisions the interpreter pinned by `.python-version` — adopting a matching one already on the machine, or downloading a standalone build (about 15 MB) if there isn't one. **Do not create a virtual environment by hand, do not activate anything, and never copy a `.venv` between machines** — it records its own absolute path.
+
+Then the environment file:
+```bash
 cp .env.example .env
 ```
-Open `.env` in a text editor and set the dev email path (per the scaffold README):
-```
-EMAIL_BACKEND=django.core.mail.backends.filebased.EmailBackend
-EMAIL_FILE_PATH=/Users/ped/Sites/persian-pronunciation/tmp_emails   # adjust if your root is ~/Sites/persian
-DEFAULT_FROM_EMAIL=no-reply@langcen_base.com
-SITE_DOMAIN=127.0.0.1:8000
-SITE_USE_HTTPS=False
-```
-Then run the scaffold's own environment checker, migrate, and start everything:
+Open `.env` and set four values:
+
+| Key | Value |
+|---|---|
+| `SECRET_KEY` | **generate a fresh one for this machine** — never reuse another machine's: `uv run python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
+| `EMAIL_FILE_PATH` | absolute path inside your checkout: `/Users/ped/Sites/persian/tmp_emails` |
+| `DEFAULT_FROM_EMAIL` | `no-reply@persian-pronunciation.local` |
+| `SITE_NAME` | `Persian Pronunciation` — drives the nav wordmark, page titles and the invite email |
+
+`.env.example` already sets `EMAIL_BACKEND` to Django's filebased backend, so development email is written to files. Leave `SITE_DOMAIN=127.0.0.1:8000` and `SITE_USE_HTTPS=False` as they are.
+
+If you edit `.env` with a script rather than by hand, **do not use `sed`** for `SECRET_KEY`: Django's key alphabet includes `&`, which `sed` expands to the whole match and corrupts the key silently.
+
+Then check, migrate, and start:
 ```bash
-python check_env.py
-python src/manage.py migrate
+uv run python check_env.py
+uv run python src/manage.py migrate
+npm install
 npm run dev
 ```
-**✅ Check (three things):** `check_env.py` reports a healthy environment; `migrate` prints a list of `Applying ... OK` lines; and `npm run dev` starts both the Tailwind watcher and Django — open **http://127.0.0.1:8000** and you should see the scaffold's styled landing page with working light/dark theme toggle. Leave the server running; open a second Terminal tab (⌘T) for the next steps (remember `cd ~/Sites/persian-pronunciation && source venv/bin/activate` in new tabs).
-**If it fails:** `(venv)` must show in your prompt before any `pip`/`python` command. If the page is unstyled, the Tailwind watcher isn't running — use `npm run dev`, not plain `runserver`.
+Note the `uv run` prefix on every Python command. It finds `.venv` without activation — the old "`(venv)` must show in your prompt" trap is gone.
+
+**✅ Check (four):** `check_env.py` reports `ENV: dev` and the `EMAIL_FILE_PATH` you set; `migrate` prints a run of `Applying … OK` lines; `npm install` completes; and `npm run dev` starts both the Tailwind watcher and Django — open **http://127.0.0.1:8000** and you should see a styled landing page titled **Persian Pronunciation** (not "LangCen Base") with a working light/dark theme toggle. Leave the server running and open a second Terminal tab (⌘T) for the next steps — nothing to activate in the new tab, just `cd ~/Sites/persian`.
+
+**Expected noise, neither of which is a failure:**
+- `npm install` reports advisories. Until Step 18b removes `pwa-asset-generator` that is 15; afterwards it is a handful traceable to the Tailwind CLI and `concurrently` (D11 handles those, one at a time).
+- On **npm 11 and newer** you also get `npm warn allow-scripts` for `@tailwindcss/oxide` and `@parcel/watcher`. Expected; ignore it. Both ship prebuilt binaries as platform-specific optional dependencies, so the build works with the scripts unapproved — verify with `npm run tw:build`, which should finish in well under a second. **Do not run `npm approve-scripts`** to silence the warning; that grants precisely the permission npm supply-chain attacks depend on.
+
+**If it fails:** An unstyled page means the Tailwind watcher isn't running — use `npm run dev`, not plain `runserver`. `uv sync` failing on the interpreter means `.python-version` names a build uv can't fetch; `uv python list` shows what's available. If a Python command reports missing packages, you almost certainly typed `python …` instead of `uv run python …`.
 
 ### Step 15 — Prove the scaffold's tests and hooks
 **Goal:** A known-good baseline: if these pass now, any future failure is something *we* changed.
 **Do:**
 ```bash
-pytest -q
+uv run pytest -q
 pre-commit install
 pre-commit run --all-files
 ```
-**✅ Check:** pytest reports **17 passed** (the scaffold's shipped suite: auth flows, password reset, seeding, role redirects); `pre-commit install` says hooks installed; the all-files run shows every hook `Passed`.
-**If it fails:** A failing scaffold test on a fresh clone is environment, not code — almost always a missing `.env` value from Step 14.
+**✅ Check:** pytest reports **17 passed** (the scaffold's shipped suite: auth flows, password reset, seeding, role redirects); `pre-commit install` says hooks installed; the all-files run shows every hook `Passed` (eight of them).
+
+**`pre-commit install` must be run on every machine.** Hooks live in `.git/hooks/`, which is per-clone and does not travel with a `git clone` or a `git pull`. Abacus learned this by committing twice unchecked before anyone noticed.
+
+`pre-commit run --all-files` **can modify files** — it fixes trailing whitespace and end-of-file newlines in place. Run `git status` afterwards and look at what it touched before committing.
+**If it fails:** A failing scaffold test on a fresh clone is environment, not code — almost always a missing `.env` value from Step 14. Note that on this suite `pytest -q` without the `uv run` prefix either fails outright or, worse, runs against some other Python that happens to be on the PATH.
 
 ### Step 16 — Admin login (superuser)
 **Goal:** Your own admin account in the scaffold's Unfold admin.
@@ -367,7 +388,7 @@ dev server must keep running in the first tab.
 **Do:**
 1. Logged in as an admin, go to **http://127.0.0.1:8000/users/register/** and add a user: email `teststudent@example.com`, role student.
 
-   The form still demands a password and a confirmation. Type anything valid — it is **discarded**. `RegisterForm` inherits `password1`/`password2` from Django's `UserCreationForm`, where they are declared on the form class rather than in `Meta.fields`, so narrowing `fields` to `("email",)` does not remove them; `RegisterView.form_valid()` then calls `set_unusable_password()` on the saved user regardless. Functional, but wrong for onboarding a cohort — see the note below.
+   The form asks for an email and a role, and **no password** — which is the point: `RegisterView.form_valid()` calls `set_unusable_password()`, and the invite is what lets the learner choose their own.
 
    **Not** Django admin's *Add user* page. The scaffold has two deliberate creation paths, and only one invites (`src/users/signals.py`, `send_invite_on_create`): the signal skips any new user who already has a usable password. Django admin's `AdminUserAddForm` *requires* password1/password2, so it sets one and suppresses the invite; `/users/register/` uses `RegisterForm` and calls `set_unusable_password()`, so the invite fires. Use the admin page and no email will ever appear, with nothing to indicate why.
 
@@ -376,7 +397,13 @@ dev server must keep running in the first tab.
 3. In the email text, copy the `/users/reset/<uid>/<token>/` link, paste it into the browser, set a password.
 4. Log out of admin (or use a private window) and log in at **http://127.0.0.1:8000/users/login/** as the student.
 **✅ Check (four):** the invite email file exists; the link opens a set-password page; the password saves; the student login succeeds and redirects to the student view. Logout works too (it's a POST button, not a link — by design in Django 5).
-**Known wart (8 August 2026):** `/users/register/` asks the admin for a password it then throws away. Harmless for one test user, wrong for onboarding a CULP cohort. The fix is to drop `password1`/`password2` from `RegisterForm` and let `set_unusable_password()` stand alone; the scaffold's own test suite is the check. Fix it here, then consider offering it back to `langcen_base` through the `scaffold` remote (D7).
+**Fixed 9 August 2026 — recorded because the shape of the bug recurs.** Until this date `/users/register/` demanded a password and a confirmation, then threw both away. `RegisterForm` narrowed `Meta.fields` to `("email",)`, but Django declares `password1`/`password2` on the `UserCreationForm` **class**, so `Meta.fields` never touched them. Harmless for one test user; wrong for onboarding a CULP cohort, who would each be handed a credential the system discards.
+
+The fix sets `password1 = None` and `password2 = None` on `RegisterForm` — Django's documented way to opt out of an inherited declared field — plus a `save()` override, because `UserCreationForm.save()` reads `cleaned_data["password1"]` and would otherwise raise `KeyError`. The template needed no change: it already guards every field with `{% if form.password1 %}`.
+
+**The test lesson is the part worth keeping.** `test_register.py` posted `password1`/`password2`, and Django silently ignores unrecognised POST keys — so after the fix that test still passed while proving nothing. It now posts no password *and* asserts the fields are absent from `RegisterForm().fields`. When you remove a form field, assert on the form, not on the request.
+
+Still worth offering back to `langcen_base` through the `scaffold` remote (D7).
 
 **If it fails:** No email file, and `tmp_emails/` does not exist at all → nothing was ever sent. Django's filebased backend creates that folder on its first send, so a missing folder is the symptom, not the cause. In order of likelihood: (a) the user was created through Django admin's *Add user* page rather than `/users/register/`, so it has a usable password and the invite was skipped — check with `has_usable_password()`; (b) `EMAIL_FILE_PATH` in `.env` is wrong; (c) the user is a superuser or staff, which the signal also skips.
 
@@ -384,11 +411,30 @@ dev server must keep running in the first tab.
 **Goal:** Next term you'll onboard a whole CULP cohort at once. The scaffold ships exactly this. Prove it now with its sample file.
 **Do:**
 ```bash
-uv run python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123! --dry-run
-uv run python src/manage.py seed_students data/sample_students.csv --default-password=ChangeMe123!
+uv run python src/manage.py seed_students data/sample_students.csv --dry-run
+uv run python src/manage.py seed_students data/sample_students.csv
 ```
-**✅ Check:** Dry-run lists what *would* be created without touching the database; the real run creates the users — confirm they appear in the admin Users list (and invite emails appeared in `tmp_emails/`).
-**If it fails:** CSV format errors are printed row by row; the sample file should pass as-is.
+
+**No `--default-password` — corrected 9 August 2026, and the reason matters.** This step previously passed `--default-password=ChangeMe123!`, which is the one flag that makes its own check unsatisfiable. `seed_students` chooses a create-time password as *CSV column > `--default-password` > unusable*, so that flag gives every seeded student a **usable** password — and `send_invite_on_create` (`src/users/signals.py`) skips any new user who already has one. The result is six accounts and zero invite emails, with nothing to indicate why. This is the same trap as Step 17, reached through a different command.
+
+Omitting the flag makes the create-time password `None`, the manager marks it unusable, and the invite fires for every row — which is D8's actual pilot path: learners receive a **set-password link**, never a shared credential.
+
+`seed_students` does have its own separate email path — `--send-welcome`, which requires `--site-domain` — but it mails the temporary password **in plain text** beside the reset link. Deliberately not used here: D8 specifies invite links, and a plaintext credential sent to a CULP cohort is the wrong artefact to own in a pilot with a DPIA attached.
+
+**✅ Check (four):** the dry run lists six `would create` rows and writes nothing; the real run creates them; `ls tmp_emails/ | wc -l` shows **one invite file per seeded student** (the folder will not exist until the first send — Django's filebased backend creates it); and the users appear in the admin Users list with role `student`. Confirm the invites are real by opening one — `Subject: Set your password`, a `/users/reset/<uid>/<token>/` link, and a `From:` address matching `DEFAULT_FROM_EMAIL` in your `.env`.
+
+Verify the password state directly rather than trusting the absence of an error:
+```bash
+uv run python src/manage.py shell -c "
+from django.contrib.auth import get_user_model
+U = get_user_model()
+for u in U.objects.filter(email__endswith='@example.com').order_by('email'):
+    print(u.email, u.role, 'usable_pw=', u.has_usable_password())
+"
+```
+Every row must read `usable_pw= False`. A `True` anywhere means a password was set and that learner will never receive an invite.
+
+**If it fails:** CSV format errors are printed row by row; the sample file should pass as-is. Users created but `tmp_emails/` missing entirely → a password was set after all (check the command line for `--default-password`, or a `password` column in the CSV, which outranks everything). Note the sample CSV lowercases addresses on the way in (`Ed@` → `ed@`), so re-running is a no-op rather than a duplicate.
 
 ### Step 18b — Remove `pwa-asset-generator` (Decision D12, 8 August 2026)
 **Goal:** A quiet `npm audit`. A fresh `npm install` reports 15 advisories, 11 high and 4 critical — and 12 of them, including every critical one, come through this one package, which bundles a headless Chrome (`puppeteer-core`) and its proxy stack. It is a one-shot icon generator that no npm script ever runs. The point is not the vulnerabilities themselves (all dev-only, none reaching a browser) but keeping `npm audit` output worth reading. Full reasoning: D12 in `DECISIONS.md`.
@@ -399,7 +445,17 @@ npm install
 npm audit
 ```
 The fourteen icon files in `src/core/static/core/favicon/` are committed static assets and are **not** affected — nothing about the app's appearance changes. When branding is next redone, regenerate them with a one-off `npx pwa-asset-generator …` (see README) rather than reinstalling the dependency.
-**✅ Check (three, all must hold):** `npm audit` drops from 15 advisories to roughly 3 (`nanoid` via `postcss`, `picomatch` via `@tailwindcss/cli` — these belong to D11's one-at-a-time policy, *not* to `npm audit fix`); `uv run pytest -q` still reports **17 passed**; and `npm run dev` still serves the styled landing page with a working theme toggle. **Then add the regeneration command to README.md (the D1 rule) and commit.**
+**✅ Check (three, all must hold):**
+
+1. **`pwa-asset-generator` is gone from `package.json`'s `devDependencies`, and the advisory count falls sharply** — measured on neo, 9 August 2026: **15 → 6**. Judge this by *what remains*, not by the number. Every surviving advisory must trace to a package the project genuinely uses; run `npm ls <package>` on each to prove it. On 9 August the residue was `tar` ← `@tailwindcss/cli` → `@tailwindcss/oxide` (the criticals), `shell-quote` ← `concurrently`, plus `nanoid` ← `postcss` and `picomatch` ← `@parcel/watcher`.
+
+   **Do not treat a specific number as the pass condition — it rots.** D12 was written on 8 August predicting a residue of "roughly 3"; one day later it was 6, because `@tailwindcss/oxide 4.1.13` pins `tar 7.5.1` and a batch of node-tar advisories covering `<=7.5.20` was published in between. Nothing about this project changed. That is D12's own argument arriving as evidence: an advisory list is only worth reading if it stays short enough to read.
+
+   Whatever remains belongs to **D11's one-at-a-time, test-gated policy** — bumping `@tailwindcss/cli` or `concurrently` is its own step — and **never** to `npm audit fix`, which rewrites the lockfile wholesale.
+2. `uv run pytest -q` still reports **17 passed**.
+3. `npm run dev` still serves the styled landing page with a working theme toggle. Confirm the stylesheet is genuinely being served rather than 404ing behind a page that merely loads: `curl -s -o /dev/null -w '%{http_code} %{size_download}\n' http://127.0.0.1:8000/static/core/css/output.css` — expect `200` and a size in the tens of kilobytes (85,715 bytes on 9 Aug 2026). Also confirm `ls src/core/static/core/favicon/ | wc -l` still shows **14** — the icons are committed assets and must survive untouched.
+
+**Then add the regeneration command to README.md (the D1 rule) and commit.**
 **If it fails:** Revert with `git checkout package.json package-lock.json && npm install` — the lockfile is in git, so this is fully reversible. Do **not** reach for `npm audit fix`: it rewrites the lockfile wholesale, which is exactly what D11 forbids.
 
 > **Part C complete — authentication #2 done.** The web app runs, both logins are proven, hooks and tests are green. Commit anything you changed (`git add -A && git commit -m "Configure dev environment" && git push`). Everything so far was the scaffold doing its job — now we build what's new.
@@ -450,15 +506,26 @@ The engine's fragile audio stack never touches your Mac (Decision D1): it lives 
 
 ### Step 21 — Build the engine image
 **Goal:** One file that pins the whole audio environment: MFA (Decision D2) + Whisper (D3) + analysis libraries.
-**Do:** Create `Dockerfile.engine` in the repo root:
+
+> **Read this before writing the Dockerfile — D10 applies here more than anywhere else (noted 9 August 2026).** The sketch below was written before uv was adopted and **pins nothing**: a `:latest` base image, an unpinned `mamba install`, and a `pip install` of six packages at whatever versions exist on the day. D1 promises this project rebuilds at any point in its history, and D10's second stated reason is precisely this file — **the engine is where reproducibility matters most, because the boundary table (Step 25) and the score matrix (Step 26) are numbers the paper will report.** An engine that silently rebuilds with a different librosa is an engine whose published numbers cannot be reproduced.
+>
+> **The mechanism is a decision, not an improvisation.** Two layers need pinning and they use different tooling — MFA arrives through conda, everything else through pip. Settle *how* before writing the file (an `environment.yml` with explicit versions, or conda-lock, for the conda layer; a lockfile-backed pip layer for the rest), **record it as a dated DECISIONS.md entry, then build.** This was flagged on 7 August and formally covered by D10 on 8 August; it is owed at this step and nowhere else.
+>
+> Whatever is chosen, three properties must hold: the base image is pinned (a tag *and* a digest, never `:latest`); every installed package has an exact version recorded in a committed file; and a rebuild months later either reproduces the environment or fails loudly rather than quietly drifting.
+
+**Do:** Create `Dockerfile.engine` in the repo root. The structure below is the *shape* — the pins are what Step 21's decision supplies:
 ```dockerfile
-FROM condaforge/miniforge3:latest
+# Pin the base image by tag AND digest — never :latest
+FROM condaforge/miniforge3:<tag>@sha256:<digest>
 
-# Alignment layer (Decision D2): Montreal Forced Aligner — MIT licence, maintained
-RUN mamba install -y -c conda-forge montreal-forced-aligner && mamba clean -a -y
+# Alignment layer (Decision D2): Montreal Forced Aligner — MIT licence, maintained.
+# Exact version, from the pinned conda environment file.
+RUN mamba install -y -c conda-forge montreal-forced-aligner=<version> && mamba clean -a -y
 
-# Whisper (gatekeeper, D3) + audio analysis + TextGrid parsing
-RUN pip install --no-cache-dir openai-whisper librosa soundfile scipy praatio pytest
+# Whisper (gatekeeper, D3) + audio analysis + TextGrid parsing — from a committed,
+# fully pinned requirements/lock file, never a bare package list.
+COPY engine/requirements.lock /tmp/
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock
 
 WORKDIR /app
 ```
@@ -468,8 +535,8 @@ docker build -f Dockerfile.engine -t persian-mfa .
 docker run --rm persian-mfa mfa version
 docker run --rm persian-mfa python -c "import whisper, librosa, praatio; print('all OK')"
 ```
-**✅ Check:** an MFA version prints; `all OK` prints. **Then update README.md's "How to build and run" with exactly these commands (the D1 rule) and commit.**
-**If it fails:** First build downloads ~2 GB — be patient. Network hiccups: just re-run the build (Docker resumes from cache).
+**✅ Check (three):** an MFA version prints; `all OK` prints; and **the Dockerfile contains no `:latest` and no unpinned package name** — read it back and confirm, because this is the check that is easiest to skip and most expensive to discover later. **Then update README.md's "How to build and run" with exactly these commands (the D1 rule) and commit.**
+**If it fails:** First build downloads ~2 GB — be patient. Network hiccups: just re-run the build (Docker resumes from cache). A digest mismatch on the base image means the tag was re-pushed upstream — that is the pin doing its job; look at what changed before updating it.
 
 ### Step 22 — Download the Persian MFA models
 **Goal:** MFA needs a Persian *acoustic model* (how Persian sounds) and *dictionary* (word → phonemes). Keep them in a project folder so they survive container restarts.
@@ -585,7 +652,7 @@ Also add `.venv/` and `node_modules/` to `.dockerignore` if they are not already
 …and `docker-compose.yml` with services `db` (postgres:16, env from `.env`, volume), `redis` (redis:7), `worker` (build: Dockerfile.worker, mounts the repo, env from `.env`, depends_on db+redis). Add to `.env`: `POSTGRES_DB=persian`, `POSTGRES_USER=persian`, `POSTGRES_PASSWORD=<generate one>`, `DATABASE_URL=postgres://persian:<password>@127.0.0.1:5432/persian`, `CELERY_BROKER_URL=redis://127.0.0.1:6379/0`. Point Django's settings at `DATABASE_URL`/`CELERY_BROKER_URL` (with the scaffold's sqlite as fallback when unset), add `src/config/celery.py` (standard Celery-Django boilerplate), then:
 ```bash
 docker compose up -d db redis
-python src/manage.py migrate
+uv run python src/manage.py migrate
 docker compose up -d --build worker
 ```
 **✅ Check (three):** `docker compose ps` shows db and redis `running`; `migrate` applies cleanly against Postgres; `docker compose logs worker | tail -5` ends with `celery@… ready.`
@@ -594,7 +661,7 @@ docker compose up -d --build worker
 ### Step 30 — The pronunciation models
 **Goal:** The database schema from the Phase 2 architecture doc — hardened exactly as reviewed.
 **Do:** Create a `pronunciation` Django app. Copy the models from `docs/prototype/phase_2_transitioning_to_server_architecture.md` §5–8 (`LanguageProfile`, `Lesson`, `UtteranceAttempt`, the `validate_vowel_map` validator) with the three agreed changes: replace `espeak_voice_code` with `mfa_dictionary` + `mfa_acoustic_model`; add the engine-version block to `assessment_payload` handling; and (D9, 7 Aug 2026) replace `Lesson.native_reference_audio` with a `NativeReference` model — lesson FK (PROTECT), audio file, speaker sex, optional dialect/register note, `is_active`, and a JSON field for cached per-vowel segment times. Register in admin. `makemigrations`, `migrate`.
-**✅ Check (two):** the admin shows all four models (including NativeReference); and the validator bites — try saving a Lesson whose vowel_map points at a consonant (position 2 of `salâm`), expect a clean validation error naming the mismatch. Run `pytest -q` — scaffold's 17 still green.
+**✅ Check (two):** the admin shows all four models (including NativeReference); and the validator bites — try saving a Lesson whose vowel_map points at a consonant (position 2 of `salâm`), expect a clean validation error naming the mismatch. Run `uv run pytest -q` — scaffold's 17 still green.
 
 ### Step 31 — Seed the two lessons
 **Goal:** salâm and mamnun in the database, with native audio attached.
@@ -605,7 +672,7 @@ docker compose up -d --build worker
 **Goal:** Prove web-app → queue → worker → engine → database before any UI exists.
 **Do:** A Celery task `score_attempt(attempt_id)` that runs gates → align → score and writes `assessment_payload`, `overall_score`, status transitions (QUEUED → PROCESSING → SUCCESS/FAILED with timestamps, per the Phase 2 doc's lifecycle). Plus a management command for testing:
 ```bash
-python src/manage.py score_file salaam audio/salaam_learner_good.wav
+uv run python src/manage.py score_file salaam audio/salaam_learner_good.wav
 ```
 …which creates an `UtteranceAttempt`, dispatches the task, waits, and prints the result.
 **✅ Check (three):** the JSON result prints with `overall_score`, `waveform_annotations`, the winning `reference_id` (D9), and the `engine` version block; the attempt row in admin shows SUCCESS with timestamps; feeding it `audio/silence.wav` produces FAILED with the friendly gate message stored in `error_message` — not a crash. Also record the wall-clock time from dispatch to SUCCESS — that measured number (not the 3–8 s guess) is what Step 34's "analysing…" wording must be honest about; if it's slow, switch the wrapper to MFA's `align_one`/server mode (Step 29 design note) before building the page.
@@ -628,7 +695,13 @@ cd /tmp
 git clone git@github.com:pedbad/persian-pronunciation.git test-clone
 cd test-clone
 ```
-…then follow **only** README.md, as if you were the September developer: venv, npm, `.env`, compose, migrate, seed, engine image, one scored attempt.
+…then follow **only** README.md, as if you were the September developer: `uv sync`, `.env`, `npm install`, compose, migrate, seed, engine image, one scored attempt.
+
+**Two things this test is specifically designed to catch, both learned the hard way:**
+
+- **Everything per-machine must be in the README.** A clone brings the code and the documents and nothing else — not `.venv`, not `node_modules/`, not `.env`, not the database, not `passwords.txt`, not the Docker images. Each one that the README fails to mention is a gap the September developer falls into.
+- **Run it from a genuinely different directory** (`/tmp/test-clone`, as above) and never rename that directory afterwards. `.venv` records its own absolute path, so a rename breaks it — the same rule that forced the folder swap to happen before Part C.
+
 **✅ Check:** You reach a scored attempt without once consulting your memory or this document. Every gap you hit = a missing line in the README — fix it, commit, and re-run until clean. Then delete `/tmp/test-clone`, tick the last box, and open FABLE_REVIEW.md Phase 6: the pilot.
 
 ---

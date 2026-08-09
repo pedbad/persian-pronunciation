@@ -36,25 +36,41 @@ Fixed facts, unlikely to change:
 
 - The repository is `github.com/pedbad/persian-pronunciation` (public), and it lives locally at **`~/Sites/persian`**. The local folder name and the repository name deliberately differ. `~/Sites/persian` is the project — it is not a backup, and nothing in it should be deleted.
 - Two git remotes: `origin` is this project (normal `pull`/`push`); `scaffold` is `pedbad/langcen_base`, kept connected so scaffold improvements can be merged in later (D7).
-- Parts A and B of BUILD_PLAN were completed on 7 August 2026: developer tooling installed and verified, repository created from the scaffold, documents and working memory moved into it. `memory/SETUP_LOG.md` records exactly what was installed and why.
+- Parts A and B of BUILD_PLAN were completed on 7 August 2026: developer tooling installed and verified, repository created from the scaffold, documents and working memory moved into it. **Part C completed 8–9 August 2026** — the web application runs, both logins are proven, the scaffold's 17 tests and eight pre-commit hooks are green, and the landing page and shared chrome are branded as this project rather than the scaffold. `memory/SETUP_LOG.md` records exactly what was installed and why, per machine.
 - A second machine repeats only Steps 9 and 10 (git identity, SSH key) and then clones. Everything else in Parts A–B is already done. Check this machine's tooling against `memory/SETUP_LOG.md` before assuming anything is installed.
 - A Python virtual environment must never be copied between machines and its parent folder must never be renamed after it is created — it records its own absolute path. Create a fresh one per machine. `.env`, `node_modules/`, the database and the Docker images are all per-machine too.
 
-## Skills already installed — use them at the right moments
+## The Python toolchain is uv (Decision D10) — read this before typing any command
 
-- **engineering:architecture** — whenever a new design decision comes up (record the outcome as a dated entry in DECISIONS.md)
-- **engineering:code-review** — before committing anything substantial (`align_mfa.py`, the scorer, the API endpoints)
-- **engineering:debug** — when a ✅ Check fails and the fix isn't obvious
-- **engineering:testing-strategy** — Step 28 (engine test suite) and Part F coverage
-- **engineering:documentation** — README updates at every phase boundary; runbook later
-- **engineering:system-design** — Part F wiring decisions (compose topology, task lifecycle)
-- **engineering:deploy-checklist** — Phase 6 / hosting preparation
-- **design:accessibility-review** — Step 34, the practice page (never colour alone; keyboard operation; screen-reader results list)
-- **design:ux-copy** — gate error messages, vowel hints, consent screen wording
-- **design:user-research** and **design:research-synthesis** — the think-aloud sessions and pilot feedback (FABLE_REVIEW Phase 6)
-- **design:design-critique** — practice page review before the pilot
-- **docx / pptx / xlsx / pdf** — deliverables (tutor-meeting one-pager, score-matrix tables, pilot write-up)
-- **schedule** — recurring reminders if Pedram asks for them
+`pyproject.toml` plus the committed `uv.lock` are the source of truth. `requirements.txt` and `requirements-dev.txt` were deleted on 8 August 2026 and any instruction mentioning them is stale.
+
+- Setting up a machine is **`uv sync`**. Nothing is activated; there is no `source venv/bin/activate` step.
+- **Every Python command takes a `uv run` prefix** — `uv run python src/manage.py …`, `uv run pytest -q`. A bare `python` either fails or, worse, silently runs against some other interpreter on the PATH.
+- Dependencies change **only** through `uv add` / `uv remove`, which update `pyproject.toml` and the lock together. **`uv.lock` is generated and never hand-edited.**
+- The interpreter is pinned by `.python-version`; uv provisions it. The machines' own Pythons differ and it no longer matters.
+- Under **D11**, dependency bumps are one at a time, each gated on the 17-test suite, and never bundled into another change. That includes `npm audit fix`, which is forbidden — it rewrites the lockfile wholesale.
+
+## Skills — check the session's own list, don't trust this one
+
+**Skill availability differs by machine and by session.** The authority is the skill list the running session actually offers; this section is a map of what to reach for, not a promise that a given name exists. The `engineering:*` and `design:*` names this document carried until 9 August 2026 **never existed at all** — they were invented, and following them wasted time on both machines.
+
+Names below were verified present in a session on neo, 9 August 2026:
+
+| When | Reach for |
+|---|---|
+| A ✅ Check fails and the fix isn't obvious | `superpowers:systematic-debugging` |
+| Before committing anything substantial (`align_mfa.py`, the scorer, the API endpoints) | `ecc:code-review`; the `ecc:python-reviewer` and `ecc:django-reviewer` agents |
+| Writing engine or app tests — Step 28, Part F coverage | `superpowers:test-driven-development`, `ecc:python-testing`, `pytest-django` |
+| Anything touching Django itself — models, settings, migrations, ORM | `django`, `ecc:django-patterns`, `ecc:django-security` |
+| Templates and the component UI (Step 34's practice page) | `django-cotton`, `tailwind`, `alpinejs`, `htmx` |
+| Part F wiring — compose topology, task lifecycle | `docker`, `ecc:docker-patterns`, `celery`, `ecc:django-celery`, `postgres` |
+| Step 34 accessibility — never colour alone, keyboard operation, screen-reader results | `ecc:accessibility`, `ecc:frontend-a11y`, the `ecc:a11y-architect` agent |
+| Recording a new design decision | `ecc:architecture-decision-records` — then write the dated DECISIONS.md entry by hand |
+| Phase 6 hosting preparation | `ecc:deployment-patterns`, `ecc:production-audit` |
+| Deliverables — tutor one-pager, score-matrix tables, pilot write-up | `docx`, `pptx`, `xlsx`, `pdf` |
+| Recurring reminders, if Pedram asks | `schedule` |
+
+**No equivalent exists** for the old `design:ux-copy`, `design:user-research`, `design:research-synthesis` or `design:design-critique`. Gate error messages, vowel hints, consent wording, think-aloud sessions and pilot feedback are done by hand — write them, show Pedram, iterate. Do not substitute a loosely-related skill and call it the same thing.
 
 ## How to work — the baby-step protocol (non-negotiable)
 
