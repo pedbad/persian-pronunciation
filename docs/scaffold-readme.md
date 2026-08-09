@@ -1,3 +1,5 @@
+> **📌 This is the scaffold's README, kept for reference — it is not this project's instructions (9 August 2026).** It documents [`pedbad/langcen_base`](https://github.com/pedbad/langcen_base), the Django starter this repository was created from (D7), and it describes a **`venv` + `pip install -r requirements.txt`** workflow. **This project does not work that way.** Under Decision **D10** the Python toolchain is **uv** — `pyproject.toml` plus a committed `uv.lock`, and one command, `uv sync` — and `requirements.txt` / `requirements-dev.txt` were deleted on 8 August 2026. For build and run instructions that actually work here, read the **root `README.md`**; for the step-by-step build, `docs/BUILD_PLAN.md`. Nothing below is wrong: the scaffold deliberately stays on pip, and this file simply describes a different repository.
+
 # langcen_base
 
 ![Python](https://img.shields.io/badge/python-3.13-blue)

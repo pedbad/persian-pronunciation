@@ -9,7 +9,7 @@ A tool that listens to a learner say a Persian word, compares it vowel-by-vowel 
 - **`docs/BUILD_PLAN.md`** — the hands-on build manual: from empty Mac to working app, every command paired with a check. Start here when you sit down to build.
 - **`docs/prototype/`** — the original brainstorming documents (tutorial, platform vision, handover, Phase 2 architecture) and the gap review. Note the decision banners at the top of each: the aeneas-based sections are historical.
 - **`memory/`** — the project's working memory, synced across machines by this repo: `JOURNAL.md` (append-only session log — read the latest entry before starting work), `RESEARCH_LOG.md` (material for a future paper), and `SETUP_LOG.md` (a plain-English explanation of every tool the project installs, and why).
-- **`CLAUDE.md`** — the working protocol, loaded automatically by Claude Code at the start of every session. A copy of `docs/HANDOVER.md`.
+- **`CLAUDE.md`** — the working protocol, loaded automatically by Claude Code at the start of every session. **This is the single source**; `docs/HANDOVER.md` is the superseded original, reduced to a pointer.
 - **Scaffold** — this repository was created from [`pedbad/langcen_base`](https://github.com/pedbad/langcen_base) (Decision D7), which remains connected as a git remote named `scaffold` so future scaffold improvements can be merged in. Its own README is preserved at `docs/scaffold-readme.md`.
 
 ## How to build and run
