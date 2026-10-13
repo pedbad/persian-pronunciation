@@ -1,11 +1,10 @@
 # Handover — Persian Pronunciation Project
-*(Paste this whole document as the first message of the new session.)*
 
 You are picking up an in-progress project. Read this fully, then open the documents listed below before doing anything else.
 
 ## Who you're working with
 
-Pedram (pb357@cam.ac.uk, GitHub: **pedbad**), on macOS. Working style is non-negotiable: **baby steps**. One step at a time, explain what a command does *before* running it, verify every step with its check, show the output, and never continue past a failed check. Ask rather than assume.
+Pedram (pb357@cam.ac.uk, GitHub: **pedbad**), on macOS. Working style is non-negotiable: **baby steps**. One step at a time, explain what a command does _before_ running it, verify every step with its check, show the output, and never continue past a failed check. Ask rather than assume.
 
 ## The project
 
@@ -56,19 +55,19 @@ Fixed facts, unlikely to change:
 
 Names below were verified present in a session on neo, 9 August 2026:
 
-| When | Reach for |
-|---|---|
-| A ✅ Check fails and the fix isn't obvious | `superpowers:systematic-debugging` |
-| Before committing anything substantial (`align_mfa.py`, the scorer, the API endpoints) | `ecc:code-review`; the `ecc:python-reviewer` and `ecc:django-reviewer` agents |
-| Writing engine or app tests — Step 28, Part F coverage | `superpowers:test-driven-development`, `ecc:python-testing`, `pytest-django` |
-| Anything touching Django itself — models, settings, migrations, ORM | `django`, `ecc:django-patterns`, `ecc:django-security` |
-| Templates and the component UI (Step 34's practice page) | `django-cotton`, `tailwind`, `alpinejs`, `htmx` |
-| Part F wiring — compose topology, task lifecycle | `docker`, `ecc:docker-patterns`, `celery`, `ecc:django-celery`, `postgres` |
-| Step 34 accessibility — never colour alone, keyboard operation, screen-reader results | `ecc:accessibility`, `ecc:frontend-a11y`, the `ecc:a11y-architect` agent |
-| Recording a new design decision | `ecc:architecture-decision-records` — then write the dated DECISIONS.md entry by hand |
-| Phase 6 hosting preparation | `ecc:deployment-patterns`, `ecc:production-audit` |
-| Deliverables — tutor one-pager, score-matrix tables, pilot write-up | `docx`, `pptx`, `xlsx`, `pdf` |
-| Recurring reminders, if Pedram asks | `schedule` |
+| When                                                                                   | Reach for                                                                             |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| A ✅ Check fails and the fix isn't obvious                                             | `superpowers:systematic-debugging`                                                    |
+| Before committing anything substantial (`align_mfa.py`, the scorer, the API endpoints) | `ecc:code-review`; the `ecc:python-reviewer` and `ecc:django-reviewer` agents         |
+| Writing engine or app tests — Step 28, Part F coverage                                 | `superpowers:test-driven-development`, `ecc:python-testing`, `pytest-django`          |
+| Anything touching Django itself — models, settings, migrations, ORM                    | `django`, `ecc:django-patterns`, `ecc:django-security`                                |
+| Templates and the component UI (Step 34's practice page)                               | `django-cotton`, `tailwind`, `alpinejs`, `htmx`                                       |
+| Part F wiring — compose topology, task lifecycle                                       | `docker`, `ecc:docker-patterns`, `celery`, `ecc:django-celery`, `postgres`            |
+| Step 34 accessibility — never colour alone, keyboard operation, screen-reader results  | `ecc:accessibility`, `ecc:frontend-a11y`, the `ecc:a11y-architect` agent              |
+| Recording a new design decision                                                        | `ecc:architecture-decision-records` — then write the dated DECISIONS.md entry by hand |
+| Phase 6 hosting preparation                                                            | `ecc:deployment-patterns`, `ecc:production-audit`                                     |
+| Deliverables — tutor one-pager, score-matrix tables, pilot write-up                    | `docx`, `pptx`, `xlsx`, `pdf`                                                         |
+| Recurring reminders, if Pedram asks                                                    | `schedule`                                                                            |
 
 **No equivalent exists** for the old `design:ux-copy`, `design:user-research`, `design:research-synthesis` or `design:design-critique`. Gate error messages, vowel hints, consent wording, think-aloud sessions and pilot feedback are done by hand — write them, show Pedram, iterate. Do not substitute a loosely-related skill and call it the same thing.
 
