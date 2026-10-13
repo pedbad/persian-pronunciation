@@ -18,6 +18,7 @@ How to change a decision: add a new dated entry underneath the old one — never
 | D10 | uv is the Python toolchain: `pyproject.toml` + `uv.lock` are the source of truth, `.venv`, `requirements*.txt` retired | ✅ Agreed 8 Aug 2026 |
 | D11 | Dependency version policy: track the Django 5.2 LTS line through the pilot; LTS→LTS to 6.2 afterwards; third-party bumps one at a time, gated on the test suite | ✅ Agreed 8 Aug 2026 |
 | D12 | Remove `pwa-asset-generator` at the end of Part C (new Step 18b); regenerate PWA icons on demand with `npx` | ✅ Agreed 8 Aug 2026 |
+| D13 | Clear residual npm advisories: remove unused `postcss`/`autoprefixer`; bump `concurrently` and Tailwind within existing ranges; three steps, each gated | ✅ Agreed 13 Oct 2026 |
 
 ---
 
@@ -210,3 +211,43 @@ The tool is also the right shape for removal: it is a **one-shot generator**, no
 > **The rule that follows: an acceptance criterion may state what must be true of the artefact, but never a count that an external database supplies.** BUILD_PLAN Step 18b's check was rewritten accordingly — the package is absent, and every surviving advisory traces via `npm ls` to a dependency the project genuinely uses. A criterion phrased as a fixed number fails on a day when nothing is wrong, which trains its reader to ignore it — the precise failure D12 exists to prevent. The residue belongs to **D11**'s one-at-a-time, test-gated policy (bumping `@tailwindcss/cli` and `concurrently` are separate steps) and never to `npm audit fix`.
 >
 > This generalises beyond dependency audits: any check whose expected value is maintained by someone else — a published model accuracy, a corpus's contents, an external service's behaviour — has the same shape, and should be phrased against the artefact rather than against the external claim.
+
+---
+
+## D13 — Clear the residual npm advisories: remove the unused PostCSS pair, bump Tailwind and `concurrently` in range (13 October 2026)
+
+**What:** The npm advisories left after D12 are cleared in **three separate steps**, each its own commit, in this order:
+
+1. **Remove `postcss` and `autoprefixer`** from `devDependencies`. Nothing uses them. No PostCSS configuration exists, no file imports either package, and the build scripts call the Tailwind v4 CLI directly. That CLI does its own CSS processing and adds vendor prefixes itself, without PostCSS. Both packages arrived with the scaffold.
+2. **Bump `concurrently` 9.2.1 → 9.2.5**, the newest version within the existing `^9.0.1` range. **Version 10 is rejected**: it is a new major version, and it would be adopted for no reason except that it exists.
+3. **Bump `tailwindcss` and `@tailwindcss/cli` together, 4.1.13 → 4.3.3**, within the existing `^4.1.13` ranges. The pair moves as one step because the CLI and the engine must stay on matching versions.
+
+Each step uses `npm install <pkg>@<version>` or `npm uninstall <pkg>`, never `npm audit fix` (D11).
+
+**Why:** The finding came from the cross-machine setup audit. An `npm ls --depth=0` showed dozens of extraneous packages, the puppeteer stack D12 removed from `package.json` but never cleared from that machine's `node_modules`. `npm ci` rebuilt `node_modules` exactly from the lockfile and cleared them. The audit run afterwards still reported advisories, all of which trace through `npm ls` to five direct dependencies:
+
+| Advisory root | Reached through | Cleared by |
+|---|---|---|
+| `postcss`, `nanoid`, `source-map-js` | `postcss` (direct) | Step 1 |
+| `browserslist`, `baseline-browser-mapping` | `autoprefixer` | Step 1 |
+| `shell-quote` | `concurrently` | Step 2 |
+| `tar` | `@tailwindcss/cli` → `@tailwindcss/oxide` | Step 3 |
+| `braces`/`micromatch`/`@parcel/watcher`, `picomatch` | `@tailwindcss/cli` | Step 3 |
+
+D12's reasoning still applies: these are build-time tools that only process our own CSS, and the argument for clearing them is **keeping `npm audit` useful as a warning**, not immediate danger. **Removal beats bumping** where a package is unused, because a removed package can never produce another advisory. Every bump fits inside ranges `package.json` already declares, so no new major version enters the project.
+
+**Order:** lowest risk first. Removing dead packages cannot change the output. `concurrently` only runs the dev processes side by side. Tailwind 4.1 → 4.3 is a minor release of the tool that **generates every style in the app**, so it goes last and gets a visual check.
+
+**Gates, written against the artefact (per D12's amendment), never against an advisory count:**
+
+- **Step 1:** before removing, build `output.css` with `npm run tw:build` and keep a copy. After removing, build again. The two files must be **byte-identical**, which proves the packages really were unused. `uv run pytest -q` passes. `npm ls` no longer lists either package.
+- **Step 2:** `npm run dev` starts both processes and serves a styled page. Ctrl-C stops both. Tests pass.
+- **Step 3:** `npm run tw:build` succeeds. Landing, login and admin pages are visually checked against the pre-bump version (`output.css` *will* differ in this step, and that is expected). Tests pass.
+- **For every step:** afterwards, no `npm audit` advisory traces through `npm ls` to the package just changed. If any gate fails, revert using `package-lock.json` from git.
+
+**Consequences:**
+
+- **A third deliberate divergence from the scaffold** (after D10 and D12). Merges from the `scaffold` remote may bring `postcss` and `autoprefixer` back into `package.json`; reconcile by hand.
+- **New advisories will keep arriving** against versions already pinned, as the D12 amendment recorded. This decision clears today's set; it doesn't promise a permanently clean audit. Each future one gets the same treatment: trace with `npm ls`, then remove or bump one package at a time.
+- **`concurrently` 10 and any Tailwind 5 are future, separate decisions.**
+- **No `scorer_version` impact.** Nothing about scoring changes.
