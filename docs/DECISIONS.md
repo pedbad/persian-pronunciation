@@ -18,7 +18,7 @@ How to change a decision: add a new dated entry underneath the old one — never
 | D10 | uv is the Python toolchain: `pyproject.toml` + `uv.lock` are the source of truth, `.venv`, `requirements*.txt` retired | ✅ Agreed 8 Aug 2026 |
 | D11 | Dependency version policy: track the Django 5.2 LTS line through the pilot; LTS→LTS to 6.2 afterwards; third-party bumps one at a time, gated on the test suite | ✅ Agreed 8 Aug 2026 |
 | D12 | Remove `pwa-asset-generator` at the end of Part C (new Step 18b); regenerate PWA icons on demand with `npx` | ✅ Agreed 8 Aug 2026 |
-| D13 | Clear residual npm advisories: remove unused `postcss`/`autoprefixer`; bump `concurrently` and Tailwind within existing ranges; three steps, each gated | ✅ Agreed 13 Oct 2026 |
+| D13 | Clear residual npm advisories: remove unused `postcss`/`autoprefixer`; bump `concurrently` and Tailwind within existing ranges; three steps, each gated | ✅ Agreed 13 Oct 2026 (amended 13 Oct) |
 
 ---
 
@@ -251,3 +251,13 @@ D12's reasoning still applies: these are build-time tools that only process our 
 - **New advisories will keep arriving** against versions already pinned, as the D12 amendment recorded. This decision clears today's set; it doesn't promise a permanently clean audit. Each future one gets the same treatment: trace with `npm ls`, then remove or bump one package at a time.
 - **`concurrently` 10 and any Tailwind 5 are future, separate decisions.**
 - **No `scorer_version` impact.** Nothing about scoring changes.
+
+> **Amendment — 13 October 2026, after all three steps.** Steps 1–3 were carried out and committed separately (`1a41b8e`, `fbb326d`, `ab08aac`). Every gate passed except one, and two parts of the original entry were wrong.
+>
+> **The table misassigned `source-map-js`.** It said Step 1 would clear it. But `@tailwindcss/node` also uses it, so it stayed after Step 1 and cleared in Step 3 (1.2.1 → 1.2.2). The trace check caught this; the table had predicted from one `npm ls` query rather than from every path to the package.
+>
+> **Step 3's "nothing traces to the package just changed" gate is not met, and the residue is knowingly accepted.** `@tailwindcss/cli` 4.3.3, the newest release, pins `@parcel/watcher` to exactly `2.5.1`, and that watcher carries `micromatch`, which brings in `braces` and `picomatch` (both high). `@parcel/watcher` 2.6.0 drops `micromatch`, but Tailwind's exact pin rules it out, so no fix exists inside the declared ranges. `braces` has no fixed version at all. Forcing 2.6.0 with an npm `overrides` entry was considered and **rejected**. The watcher is a native compiled add-on, and running it in a combination Tailwind never shipped risks `tw:watch` silently failing to rebuild CSS, all to clear advisories in a tool that only matches file patterns on our own source files, in dev mode, on the laptop (D6).
+>
+> **Revisit when a Tailwind release moves the watcher pin.** At that point, bumping the Tailwind pair should clear the residue as an ordinary D11 step. Until then, these advisories are expected noise and are named here so they don't hide new ones. That is D12's point about keeping `npm audit` useful as a warning.
+>
+> **Net effect, stated against the artefact:** `postcss` and `autoprefixer` are gone from the project, with `output.css` byte-identical without them. No critical advisory remains. Every remaining advisory traces to the single pinned watcher above. `output.css` under 4.3.3 is 393 bytes larger, with no visible change on the landing, login or admin-login pages.
